@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Tue Dec  4 17:06:26 2018
-@author: mgreen13
+@author: mgreen1
 0 = firebreak, 1 = fire, 2 = tree
 """
 import numpy as np
@@ -338,9 +338,11 @@ def fire_init(landscape,gamma, zMax,threshold,init_time):
 
 
 # TEST CASE ON PERLIN NOISE LANDSCAPE
+landscape_file = sys.argv[1]
+time_steps = int(sys.argv[2])
 
 
-bowlSmall = np.load("perlin_50_x_50_100.npy")
+bowlSmall = np.load(landscape_file)
 # initialize contained
 contained = False
 
@@ -360,7 +362,7 @@ for i in list(range(len(landscape))):
                 
 #initialize fire cluster, determine how many time steps we want the fire to run 
                 
-stateMaps = fire_init(landscape,.7,4,5,60)
+stateMaps = fire_init(landscape,.7,4,5,time_steps)
 #propogate fire
 
 
@@ -374,8 +376,8 @@ for i,frame in enumerate(stateMaps):
     cmap = colors.ListedColormap(['red', 'green'])
     cax = ax.matshow(frame,cmap = cmap)
     plt.contour(zVals, colors = "b")
-    figname = "{}.png".format(i)
+    figname = "gif_fire/{}.png".format(i)
 
-    #plt.savefig(figname)
-    #plt.close(fig)
+    plt.savefig(figname)
+    plt.close(fig)
 
