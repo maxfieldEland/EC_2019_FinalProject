@@ -1,0 +1,28 @@
+\documentclass[12pt]{article}
+\usepackage{lingmacros}
+\usepackage{tree-dvips}
+\usepackage{amsmath}
+\usepackage{float}
+\usepackage{graphicx,mwe,subfig, wrapfig, setspace, booktabs}
+\usepackage{subfig}
+
+\begin{document}
+\section*{Evolutionary Computation}
+\textbf{Maxfield Green}
+\section*{Project Pitch : Agent Based Model of Fire Spreading with GA Driven Spread Factors}
+\begin{enumerate}  \item Problem Description \\\\
+For the Evolutionary Computation final project, I propose to model surface spreading of wildfires within a agent based spreading framework. I have previously developed a sandbox environment to build
+spreading simulations on different landscapes according to different spreading rules and mechanisms. I propose the use of a symbolic regression analysis to uncover a set of optimal relationships between 
+adjacent neighbor and environmental states. In the model, the agents represent discretized chucks of space that change state depending on the states
+of their neighbors.  
+
+This problem is well suited for Genetic Algorithms as there are (1) clearly defined building blocks,
+ (2) a suitable fitness function, (3) selection mechanism choose which agents are considered for future evolution,
+ (4) a data set to validate model utility. \\\\
+ 
+The genome is represented by a tree of terminals and functions that could possibly describe fire dynamics. The function will be predicting the probability
+that a given cell will catch fire in the next time step. The agent based model is written in python and I imagine I will use the DEEP framework to implement the symbolic regression.
+The fire we will be simulating occurred in May of 2016 in Fort McMurray, Alberta. The data is a timeseries of satellite images that capture the progression of the boundary 
+at a 12 hour time resolution with a 375 m space resolution. 
+\end{enumerate} 
+\end{document}
