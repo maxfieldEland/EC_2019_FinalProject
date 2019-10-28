@@ -1,0 +1,497 @@
+%%% ====================================================================
+%%%  BibTeX-file{
+%%%     author          = "Gerry Murray",
+%%%     version         = "1.2",
+%%%     date            = "2 April 2012",
+%%%     filename        = "acmsmall-sample-bibfile.bib",
+%%%     address         = "ACM, NY",
+%%%     email           = "murray at hq.acm.org",
+%%%     codetable       = "ISO/ASCII",
+%%%     keywords        = "ACM Reference Format, bibliography, citation, references",
+%%%     supported       = "yes",
+%%%     docstring       = "This BibTeX database file contains 'bibdata' entries
+%%%                        that 'match' the examples provided in the Specifications Document
+%%%                        AND, also, 'legacy'-type bibs. It should assist authors in 
+%%%                        choosing the 'correct' at-bibtype and necessary bib-fields
+%%%                        so as to obtain the appropriate ACM Reference Format output. 
+%%%			   It also contains many 'Standard Abbreviations'. "
+%%%  }
+%%% ====================================================================
+
+% Journals
+
+% First the Full Name is given, then the abbreviation used in the AMS Math
+% Reviews, with an indication if it could not be found there.
+% Note the 2nd overwrites the 1st, so swap them if you want the full name.
+
+ %{AMS}
+ @String{AMSTrans = "American Mathematical Society Translations" }
+ @String{AMSTrans = "Amer. Math. Soc. Transl." }
+ @String{BullAMS = "Bulletin of the American Mathematical Society" }
+ @String{BullAMS = "Bull. Amer. Math. Soc." }
+ @String{ProcAMS = "Proceedings of the American Mathematical Society" }
+ @String{ProcAMS = "Proc. Amer. Math. Soc." }
+ @String{TransAMS = "Transactions of the American Mathematical Society" }
+ @String{TransAMS = "Trans. Amer. Math. Soc." }
+
+ %ACM
+ @String{CACM = "Communications of the {ACM}" }
+ @String{CACM = "Commun. {ACM}" }
+ @String{CompServ = "Comput. Surveys" }
+ @String{JACM = "J. ACM" }
+ @String{ACMMathSoft = "{ACM} Transactions on Mathematical Software" }
+ @String{ACMMathSoft = "{ACM} Trans. Math. Software" }
+ @String{SIGNUM = "{ACM} {SIGNUM} Newsletter" }
+ @String{SIGNUM = "{ACM} {SIGNUM} Newslett." }
+
+ @String{AmerSocio = "American Journal of Sociology" }
+ @String{AmerStatAssoc = "Journal of the American Statistical Association" }
+ @String{AmerStatAssoc = "J. Amer. Statist. Assoc." }
+ @String{ApplMathComp = "Applied Mathematics and Computation" }
+ @String{ApplMathComp = "Appl. Math. Comput." }
+ @String{AmerMathMonthly = "American Mathematical Monthly" }
+ @String{AmerMathMonthly = "Amer. Math. Monthly" }
+ @String{BIT = "{BIT}" }
+ @String{BritStatPsych = "British Journal of Mathematical and Statistical
+          Psychology" }
+ @String{BritStatPsych = "Brit. J. Math. Statist. Psych." }
+ @String{CanMathBull = "Canadian Mathematical Bulletin" }
+ @String{CanMathBull = "Canad. Math. Bull." }
+ @String{CompApplMath = "Journal of Computational and Applied Mathematics" }
+ @String{CompApplMath = "J. Comput. Appl. Math." }
+ @String{CompPhys = "Journal of Computational Physics" }
+ @String{CompPhys = "J. Comput. Phys." }
+ @String{CompStruct = "Computers and Structures" }
+ @String{CompStruct = "Comput. \& Structures" }
+ @String{CompJour = "The Computer Journal" }
+ @String{CompJour = "Comput. J." }
+ @String{CompSysSci = "Journal of Computer and System Sciences" }
+ @String{CompSysSci = "J. Comput. System Sci." }
+ @String{Computing = "Computing" }
+ @String{ContempMath = "Contemporary Mathematics" }
+ @String{ContempMath = "Contemp. Math." }
+ @String{Crelle = "Crelle's Journal" }
+ @String{GiornaleMath = "Giornale di Mathematiche" }
+ @String{GiornaleMath = "Giorn. Mat." } % didn't find in AMS MR., ibid.
+
+ %IEEE
+ @String{Computer = "{IEEE} Computer" }
+ @String{IEEETransComp = "{IEEE} Transactions on Computers" }
+ @String{IEEETransComp = "{IEEE} Trans. Comput." }
+ @String{IEEETransAC = "{IEEE} Transactions on Automatic Control" }
+ @String{IEEETransAC = "{IEEE} Trans. Automat. Control" }
+ @String{IEEESpec = "{IEEE} Spectrum" } % didn't find in AMS MR
+ @String{ProcIEEE = "Proceedings of the {IEEE}" }
+ @String{ProcIEEE = "Proc. {IEEE}" } % didn't find in AMS MR
+ @String{IEEETransAeroElec = "{IEEE} Transactions on Aerospace and Electronic
+     Systems" }
+ @String{IEEETransAeroElec = "{IEEE} Trans. Aerospace Electron. Systems" }
+
+ @String{IMANumerAna = "{IMA} Journal of Numerical Analysis" }
+ @String{IMANumerAna = "{IMA} J. Numer. Anal." }
+ @String{InfProcLet = "Information Processing Letters" }
+ @String{InfProcLet = "Inform. Process. Lett." }
+ @String{InstMathApp = "Journal of the Institute of Mathematics and
+     its Applications" }
+ @String{InstMathApp = "J. Inst. Math. Appl." }
+ @String{IntControl = "International Journal of Control" }
+ @String{IntControl = "Internat. J. Control" }
+ @String{IntNumerEng = "International Journal for Numerical Methods in
+     Engineering" }
+ @String{IntNumerEng = "Internat. J. Numer. Methods Engrg." }
+ @String{IntSuper = "International Journal of Supercomputing Applications" }
+ @String{IntSuper = "Internat. J. Supercomputing Applic." } % didn't find
+%% in AMS MR
+ @String{Kibernetika = "Kibernetika" }
+ @String{JResNatBurStand = "Journal of Research of the National Bureau
+     of Standards" }
+ @String{JResNatBurStand = "J. Res. Nat. Bur. Standards" }
+ @String{LinAlgApp = "Linear Algebra and its Applications" }
+ @String{LinAlgApp = "Linear Algebra Appl." }
+ @String{MathAnaAppl = "Journal of Mathematical Analysis and Applications" }
+ @String{MathAnaAppl = "J. Math. Anal. Appl." }
+ @String{MathAnnalen = "Mathematische Annalen" }
+ @String{MathAnnalen = "Math. Ann." }
+ @String{MathPhys = "Journal of Mathematical Physics" }
+ @String{MathPhys = "J. Math. Phys." }
+ @String{MathComp = "Mathematics of Computation" }
+ @String{MathComp = "Math. Comp." }
+ @String{MathScand = "Mathematica Scandinavica" }
+ @String{MathScand = "Math. Scand." }
+ @String{TablesAidsComp = "Mathematical Tables and Other Aids to Computation" }
+ @String{TablesAidsComp = "Math. Tables Aids Comput." }
+ @String{NumerMath = "Numerische Mathematik" }
+ @String{NumerMath = "Numer. Math." }
+ @String{PacificMath = "Pacific Journal of Mathematics" }
+ @String{PacificMath = "Pacific J. Math." }
+ @String{ParDistComp = "Journal of Parallel and Distributed Computing" }
+ @String{ParDistComp = "J. Parallel and Distrib. Comput." } % didn't find
+%% in AMS MR
+ @String{ParComputing = "Parallel Computing" }
+ @String{ParComputing = "Parallel Comput." }
+ @String{PhilMag = "Philosophical Magazine" }
+ @String{PhilMag = "Philos. Mag." }
+ @String{ProcNAS = "Proceedings of the National Academy of Sciences
+                    of the USA" }
+ @String{ProcNAS = "Proc. Nat. Acad. Sci. U. S. A." }
+ @String{Psychometrika = "Psychometrika" }
+ @String{QuartMath = "Quarterly Journal of Mathematics, Oxford, Series (2)" }
+ @String{QuartMath = "Quart. J. Math. Oxford Ser. (2)" }
+ @String{QuartApplMath = "Quarterly of Applied Mathematics" }
+ @String{QuartApplMath = "Quart. Appl. Math." }
+ @String{RevueInstStat = "Review of the International Statisical Institute" }
+ @String{RevueInstStat = "Rev. Inst. Internat. Statist." }
+
+ %SIAM
+ @String{JSIAM = "Journal of the Society for Industrial and Applied
+     Mathematics" }
+ @String{JSIAM = "J. Soc. Indust. Appl. Math." }
+ @String{JSIAMB = "Journal of the Society for Industrial and Applied
+     Mathematics, Series B, Numerical Analysis" }
+ @String{JSIAMB = "J. Soc. Indust. Appl. Math. Ser. B Numer. Anal." }
+ @String{SIAMAlgMeth = "{SIAM} Journal on Algebraic and Discrete Methods" }
+ @String{SIAMAlgMeth = "{SIAM} J. Algebraic Discrete Methods" }
+ @String{SIAMAppMath = "{SIAM} Journal on Applied Mathematics" }
+ @String{SIAMAppMath = "{SIAM} J. Appl. Math." }
+ @String{SIAMComp = "{SIAM} Journal on Computing" }
+ @String{SIAMComp = "{SIAM} J. Comput." }
+ @String{SIAMMatrix = "{SIAM} Journal on Matrix Analysis and Applications" }
+ @String{SIAMMatrix = "{SIAM} J. Matrix Anal. Appl." }
+ @String{SIAMNumAnal = "{SIAM} Journal on Numerical Analysis" }
+ @String{SIAMNumAnal = "{SIAM} J. Numer. Anal." }
+ @String{SIAMReview = "{SIAM} Review" }
+ @String{SIAMReview = "{SIAM} Rev." }
+ @String{SIAMSciStat = "{SIAM} Journal on Scientific and Statistical
+     Computing" }
+ @String{SIAMSciStat = "{SIAM} J. Sci. Statist. Comput." }
+
+ @String{SoftPracExp = "Software Practice and Experience" }
+ @String{SoftPracExp = "Software Prac. Experience" } % didn't find in AMS MR
+ @String{StatScience = "Statistical Science" }
+ @String{StatScience = "Statist. Sci." }
+ @String{Techno = "Technometrics" }
+ @String{USSRCompMathPhys = "{USSR} Computational Mathematics and Mathematical
+     Physics" }
+ @String{USSRCompMathPhys = "{U. S. S. R.} Comput. Math. and Math. Phys." }
+ @String{VLSICompSys = "Journal of {VLSI} and Computer Systems" }
+ @String{VLSICompSys = "J. {VLSI} Comput. Syst." }
+ @String{ZAngewMathMech = "Zeitschrift fur Angewandte Mathematik und
+     Mechanik" }
+ @String{ZAngewMathMech = "Z. Angew. Math. Mech." }
+ @String{ZAngewMathPhys = "Zeitschrift fur Angewandte Mathematik und Physik" }
+ @String{ZAngewMathPhys = "Z. Angew. Math. Phys." }
+
+% Publishers % ================================================= |
+
+ @String{Academic = "Academic Press" }
+ @String{ACMPress = "{ACM} Press" }
+ @String{AdamHilger = "Adam Hilger" }
+ @String{AddisonWesley = "Addison-Wesley" }
+ @String{AllynBacon = "Allyn and Bacon" }
+ @String{AMS = "American Mathematical Society" }
+ @String{Birkhauser = "Birkha{\"u}ser" }
+ @String{CambridgePress = "Cambridge University Press" }
+ @String{Chelsea = "Chelsea" }
+ @String{ClaredonPress = "Claredon Press" }
+ @String{DoverPub = "Dover Publications" }
+ @String{Eyolles = "Eyolles" }
+ @String{HoltRinehartWinston = "Holt, Rinehart and Winston" }
+ @String{Interscience = "Interscience" }
+ @String{JohnsHopkinsPress = "The Johns Hopkins University Press" }
+ @String{JohnWileySons = "John Wiley and Sons" }
+ @String{Macmillan = "Macmillan" }
+ @String{MathWorks = "The Math Works Inc." }
+ @String{McGrawHill = "McGraw-Hill" }
+ @String{NatBurStd = "National Bureau of Standards" }
+ @String{NorthHolland = "North-Holland" }
+ @String{OxfordPress = "Oxford University Press" }  %address Oxford or London?
+ @String{PergamonPress = "Pergamon Press" }
+ @String{PlenumPress = "Plenum Press" }
+ @String{PrenticeHall = "Prentice-Hall" }
+ @String{SIAMPub = "{SIAM} Publications" }
+ @String{Springer = "Springer-Verlag" }
+ @String{TexasPress = "University of Texas Press" }
+ @String{VanNostrand = "Van Nostrand" }
+ @String{WHFreeman = "W. H. Freeman and Co." }
+
+%Entries
+@article{ferragut2007numerical,
+  title={A numerical method for solving convection-reaction-diffusion multivalued equations in fire spread modelling},
+  author={Ferragut, L and Asensio, MI and Monedero, S},
+  journal={Advances in Engineering Software},
+  volume={38},
+  number={6},
+  pages={366--371},
+  year={2007},
+  publisher={Elsevier Science Ltd.}
+}
+
+@article{ZhengZhong2017Ffss,
+issn = {0304-3800},
+abstract = {•A new cellular automaton model of forest fire spreading was proposed.•Its performance was evaluated using data collected from five fires in the west of United States.•This proposed model performed well in predicting each cell’s igniting probability.•It can describe the impact of wind velocity on fire spreading pattern effectively.•It achieves good accuracies in simulating forest fire spread. The quantitative simulation of forest fire spreading plays an essential role in designing quick risk management and implementing effective suppression policies. As a preferable modelling approach, the cellular automaton (CA) has been used to simulate the complex mechanisms of fire spreading. However, in traditional CA models, comprehensive studies on the physical principles of forest fires are needed to define the local transition rules. Instead of defining transition rules, the Extreme Learning Machine (ELM) was applied in this study. By integrating the ELM with the traditional forest fire CA framework, a new cellular automaton modelling approach was proposed. After that, its performance was validated using data collected from five fires in the west of United States. Results show that the ELM performed well in predicting each cell’s igniting probability. The impact of wind velocity on fire spreading pattern can be effectively described by the proposed modelling approach. Furthermore, the validation against actual fire behavior observations shows that its simulation performance is acceptable and in most cases is better than that of the previously reported studies.},
+journal = {Ecological Modelling},
+pages = {33--43},
+volume = {348},
+publisher = {Elsevier B.V.},
+year = {2017},
+title = {Forest fire spread simulating model using cellular automaton with extreme learning machine},
+language = {eng},
+author = {Zheng, Zhong and Huang, Wei and Li, Songnian and Zeng, Yongnian},
+keywords = {Cellular Automaton ; Machine Learning ; Forest Fire ; Simulation},
+}
+@article{cortez2007data,
+  title={A data mining approach to predict forest fires using meteorological data},
+  author={Cortez, Paulo and Morais, An{\'\i}bal de Jesus Raimundo},
+  year={2007},
+  publisher={Associa{\c{c}}{\~a}o Portuguesa para a Intelig{\^e}ncia Artificial (APPIA)}
+}
+
+@article{subramaniancomplementary,
+  title={A Complementary Approach to Improve Wild Fire Prediction Systems},
+  author={Subramanian, Sriram Ganapathi and Crowley, Mark}
+}
+
+
+@misc{verisk, title={2019 Verisk Wildfire Risk Analysis: Property Underwriting}, url={https://www.verisk.com/insurance/campaigns/location-fireline-state-risk-report/}, journal={Verisk}}
+@inproceedings{sacadura,
+  title={Radiative heat transfer in fire safety science},
+  author={Sacadura, Jean-Francois},
+  booktitle={ICHMT DIGITAL LIBRARY ONLINE},
+  year={2004},
+  organization={Begel House Inc.}
+}
+@article{sullivan2009wildland,
+  title={Wildland surface fire spread modelling, 1990--2007. 3: Simulation and mathematical analogue models},
+  author={Sullivan, Andrew L},
+  journal={International Journal of Wildland Fire},
+  volume={18},
+  number={4},
+  pages={387--403},
+  year={2009},
+  publisher={CSIRO}
+}
+@article{KochanskiA.K2013Rtso,
+issn = {0378-1127},
+abstract = {<p>► Two Santa Ana fires are simulated using coupled atmosphere–fire WRF–Sfire model. ► Computational performance allows for real-time fire forecasting. ► Santa Ana winds and the fire-head spread forecasts compare well to observations. ► WRF–Sfire results look promising with potential to complement currently used operational fire spread prediction.</p> <p>In this study we test the feasibility of using a coupled atmosphere–fire model for real time simulations of massive fires. A physics-based coupled atmosphere–fire model is used to resolve the large-scale and local weather as well as the atmosphere–fire interactions, while combustion is represented simply using an existing operational surface fire behavior model. This model combination strikes a balance between fidelity and speed of execution. The feasibility of this approach is examined based on an analysis of a numerical simulation of two very large Santa Ana fires using WRF–Sfire, a coupled atmosphere–fire model developed by the Open Wild Fire Modeling Community (OpenWFM.org). The study demonstrates that a wind and fire spread forecast of reasonable accuracy was obtained at an execution speed that would have made real-time wildfire forecasting of this event possible.</p>},
+journal = {Forest Ecology and Management},
+pages = {136--149},
+volume = {294},
+publisher = {Elsevier B.V},
+number = {C},
+year = {2013},
+title = {Real time simulation of 2007 Santa Ana fires},
+language = {eng},
+author = {Kochanski, A.K and Jenkins, M.A and Mandel, J and Beezley, J.D and Krueger, S.K},
+keywords = {Wildfire ; Modeling ; Fire ; Forecasting ; Fire Spread Prediction ; Santa Ana ; Forestry ; Biology},
+}
+
+
+@article{mandel2011coupled,
+  title={Coupled atmosphere-wildland fire modeling with WRF-fire},
+  author={Mandel, Jan and Beezley, Jonathan D and Kochanski, Adam K},
+  journal={arXiv preprint arXiv:1102.1343},
+  year={2011}
+}
+@book{drysdale,
+  title={An introduction to fire dynamics},
+  author={Drysdale, Dougal},
+  year={2011},
+  publisher={John Wiley \& Sons}
+}
+@book{grishin1997mathematical,
+  title={Mathematical modeling of forest fires and new methods of fighting them},
+  author={Grishin, Anatoli},
+  year={1997},
+  publisher={Publishing house of the Tomsk state university}
+}
+@article{hu2012devs,
+  title={DEVS-FIRE: design and application of formal discrete event wildfire spread and suppression models},
+  author={Hu, Xiaolin and Sun, Yi and Ntaimo, Lewis},
+  journal={Simulation},
+  volume={88},
+  number={3},
+  pages={259--279},
+  year={2012},
+  publisher={Sage Publications Sage UK: London, England}
+}
+@article{di1993modeling,
+  title={Modeling and simulation of combustion processes of charring and non-charring solid fuels},
+  author={Di Blasi, Colomba},
+  journal={Progress in energy and combustion science},
+  volume={19},
+  number={1},
+  pages={71--104},
+  year={1993},
+  publisher={Elsevier}
+}
+
+@article{karafyllidis1997model,
+  title={A model for predicting forest fire spreading using cellular automata},
+  author={Karafyllidis, Ioannis and Thanailakis, Adonios},
+  journal={Ecological Modelling},
+  volume={99},
+  number={1},
+  pages={87--97},
+  year={1997},
+  publisher={Elsevier}
+}
+
+
+@article{Ager,
+author = {Palaiologou, Palaiologos and Ager, Alan and Evers, Cody and Nielsen-Pincus, Max and Day, Michelle and Preisler, Haiganoush},
+year = {2019},
+month = {03},
+pages = {1-38},
+title = {Fine scale assessment of cross boundary wildfire events in the Western US},
+journal = {Natural Hazards and Earth System Sciences Discussions},
+doi = {10.5194/nhess-2019-56}
+}
+@incollection{grasso2018two,
+  title={A two-dimensional reaction-advection-diffusion model of the spread of fire in wildlands},
+  author={Grasso, Paolo and Innocente, Mauro},
+  booktitle={Advances in Forest Fire Research 2018},
+  pages={334--342},
+  year={2018},
+  publisher={Imprensa da Universidade de Coimbra}
+}
+
+@article{innocente2019self,
+  title={Self-organising swarms of firefighting drones: Harnessing the power of collective intelligence in decentralised multi-robot systems},
+  author={Innocente, Mauro S and Grasso, Paolo},
+  journal={Journal of Computational Science},
+  volume={34},
+  pages={80--101},
+  year={2019},
+  publisher={Elsevier}
+}
+
+@misc{arrhenius_svante_1889_1749766,
+  author       = {Arrhenius, Svante},
+  title        = {{Über die Reaktionsgeschwindigkeit bei der 
+                   Inversion von Rohrzucker durch Säuren}},
+  month        = jan,
+  year         = 1889,
+  doi          = {10.1515/zpch-1889-0116},
+  url          = {https://doi.org/10.1515/zpch-1889-0116}
+}
+
+@article{mandel2009data,
+  title={Data assimilation for wildland fires},
+  author={Mandel, Jan and Beezley, Jonathan D and Coen, Janice L and Kim, Minjeong},
+  journal={IEEE Control Systems Magazine},
+  volume={29},
+  number={3},
+  pages={47--65},
+  year={2009},
+  publisher={IEEE}
+}
+
+@article{castelli2015Mauro,
+author = {Castelli, Mauro and Vanneschi, Leonardo and Popovič, Aleš},
+year = {2015},
+month = {04},
+pages = {106-118},
+title = {Predicting Burned Areas of Forest Fires: An Artificial Intelligence Approach},
+volume = {11},
+journal = {Fire Ecology},
+doi = {10.4996/fireecology.1101106}
+}
+
+@article{mercer2003evans,
+  title={Evans function stability of combustion waves},
+  author={Mercer, Geoff N and Sidhu, HS and Weber, RO and Gubernov, V},
+  journal={SIAM Journal on Applied Mathematics},
+  volume={63},
+  number={4},
+  pages={1259--1275},
+  year={2003},
+  publisher={SIAM}
+}
+
+@article{weber1991toward,
+  title={Toward a comprehensive wildlife spread model},
+  author={Weber, RO},
+  journal={International Journal of Wildland Fire},
+  volume={1},
+  number={4},
+  pages={245--248},
+  year={1991},
+  publisher={CSIRO}
+}@article{mercer1995combustion,
+  title={Combustion wave speed},
+  author={Mercer, GN and Weber, RO},
+  journal={Proceedings of the Royal Society of London. Series A: Mathematical and Physical Sciences},
+  volume={450},
+  number={1938},
+  pages={193--198},
+  year={1995},
+  publisher={The Royal Society London}
+}
+
+@article{Sero-GuillaumeO,
+issn = {0017-9310},
+abstract = {In this study we derive a three-dimensional forest fire combustion model. The forest is modelled as a diphasic medium composed of a gaseous and a porous vegetal pyrolysis phase. A formal averaging method and a thermodynamic closure by use of extended irreversible thermodynamics are used to give a complete set of coupled non-linear equations for this diphasic medium. This set of equations deals with the processes of drying, the pyrolysis of the vegetal phase, and the combustion of the pyrolysis gases in this gaseous phase. A three-dimensional reaction diffusion equation for the forest fire propagation with a non-local radiation term is then derived under some simplified hypotheses.},
+journal = {International Journal of Heat and Mass Transfer},
+pages = {1705--1722},
+volume = {45},
+publisher = {Elsevier Ltd},
+number = {8},
+year = {2002},
+title = {Modelling forest fires. Part I: a complete set of equations derived by extended irreversible thermodynamics},
+language = {eng},
+author = {Séro-Guillaume, O. and Margerit, J.},
+keywords = {Computer Applications ; Computer Applications ; Forest Fires ; Forest Fires ; Combustion ; Combustion ; Mathematic Models, Forest ; Mathematic Models, Forest ; Ecology, Terrestrial ; Ecology, Terrestrial ; Thermodynamics ; Thermodynamics ; General ; General;},
+}
+
+@article{MARGERIT20021723,
+title = "Modelling forest fires. Part II: reduction to two-dimensional models and simulation of propagation",
+journal = "International Journal of Heat and Mass Transfer",
+volume = "45",
+number = "8",
+pages = "1723 - 1737",
+year = "2002",
+issn = "0017-9310",
+doi = "https://doi.org/10.1016/S0017-9310(01)00249-6",
+url = "http://www.sciencedirect.com/science/article/pii/S0017931001002496",
+author = "J Margerit and O Séro-Guillaume",
+abstract = "This is the continuation of the paper named part I, where a three-dimensional model of combustion for forest fires has been derived. In this study the link between two-dimensional reaction diffusion models of propagation and three-dimensional combustion modelling is examined. By the way of an asymptotic analysis with the ratio of the height of vegetation to a characteristic size of the forest as small parameter, it is shown that two-dimensional models can be considered as inner expansion of general models. A hierarchy of three models is obtained and the simplest, which cope with drying, pyrolysis, wind and slope is simulated. Some of the features of real fires are obtained with this simplified model."
+}
+
+@inproceedings{zhong2014automatic,
+  title={Automatic rule identification for agent-based crowd models through gene expression programming},
+  author={Zhong, Jinghui and Luo, Linbo and Cai, Wentong and Lees, Michael},
+  booktitle={Proceedings of the 2014 international conference on Autonomous agents and multi-agent systems},
+  pages={1125--1132},
+  year={2014},
+  organization={International Foundation for Autonomous Agents and Multiagent Systems}
+}
+
+@article{FIRETEC,
+author = {Linn, Rodman and Reisner, Jon and Coleman, J. and SMITH, S.},
+year = {2002},
+month = {11},
+pages = {},
+title = {Studying wildfire behavior using FIRETEC},
+volume = {11},
+journal = {International Journal of Wildland Fire},
+doi = {10.1071/WF02007}
+}
+
+@techreport{linn1997transport,
+  title={A transport model for prediction of wildfire behavior},
+  author={Linn, Rodman Ray},
+  year={1997},
+  institution={Los Alamos National Lab., NM (United States)}
+}
+@article{larini1998multiphase,
+  title={A multiphase formulation for fire propagation in heterogeneous combustible media},
+  author={Larini, M and Giroud, F and Porterie, B and Loraud, J-C},
+  journal={International Journal of Heat and Mass Transfer},
+  volume={41},
+  number={6-7},
+  pages={881--897},
+  year={1998},
+  publisher={Elsevier}
+}
+}
+
