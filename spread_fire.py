@@ -13,8 +13,48 @@ import sys
 import os
 
 class Cell():
-    # constructor for cell
+    """
+    A cell, representing the basic unit of the landscape that is modified
+    throughout the simulation.
+    
+    Attributes:
+        :int x:             X position
+        :int y:             Y position
+        :int z:             Z position
+        :tuple x,y:         Tuple of x,y position.
+        :int state:         The states of the cell
+            0 = ?
+            1 = On fire
+            2 = Tree
+        :bool visited:      Describes whether or not the cell has been visited
+        :float risk:        The risk of fire at a cell (may not be used?)
+        :int fireT:         The fire time at the cell
+        :int partition:     *** Not sure *** (may not be used?)
+        :float dz1:         Distance between current cell and 1 down on grid
+        :float dz2:         Distance between current cell and 1 up on grid
+        :float dz3:         Distance between current cell and 1 right on grid
+        :float dz4:         Distance between current cell and 1 left on grid
+        :list nStates:      States of neighbors of current cell
+        :list p:            *** Something probability related? *** (not used?)
+        :float maxDz:       Maximum distance
+        :list sptial_risk:  Risk of site an agent could move to.       
+    """
+    
     def __init__(self,x,y,z,state):
+        """
+        Constructor for the Cell class; the main component of the board and
+        the agent that is changed throughout the simulation.
+        
+        Parameters:
+            :int x:         The x position
+            :int y:         The y position
+            :int z:         The z position
+            :int state:     The state of the cell (tree, fire, etc)
+        
+        Returns:
+            None
+        """
+        
         self.x = x
         self.y = y
         self.position = x,y
@@ -34,8 +74,16 @@ class Cell():
         self.spatial_risk = None
         
     def getNTFire(self,landscape):
-        """Get fire times of all neighbors
         """
+        Returns fire times of all neighboring cells.
+        
+        Parameters:
+            :list landscape:        Matrix of heights of cells in space
+            
+        Returns:
+            :list fire_neighbor_times: List of fire times for adj. cells.
+        """
+        
         neighbor_fire_times = []
         i,j = self.getPosition()
         for n in self.getN(landscape):
@@ -45,9 +93,19 @@ class Cell():
 
     def getNState(self,landscape):
         """
-        Return states of all neighboring cells
+        Return states of all neighboring cells accounting for borders.
         
+        Parameters:
+            :list landscape:    Matrix of heights of cells in space
+        
+        Returns:
+            Returns if applicable:
+            :int n1:            State of cell above.
+            :int n2:            State of cell to right.
+            :int n3:            State of cell below.
+            :int n4:            State of cell to left.
         """
+        
         i = self.x
         j = self.y
         try:
@@ -67,8 +125,10 @@ class Cell():
         except:
             IndexError
 
-        # Build case for each border area, upper/lower left corner, upper/lower right corner
+        # Build case for each border area:
+        # upper/lower left corner, upper/lower right corner
         # All Four borders
+        
         # Upper Left Corner (No n1 or n4)
         if i == 0 and j == 0:
             return(n2,n3)
@@ -98,8 +158,19 @@ class Cell():
 
     def getN(self,landscape):
         """
-        Return neighbors of cell account for all edge cases, fire does not spread on torus
+        Returns neighbors of cell, accounting for borders (not a taurus).
+        
+        Parameters:
+            :list landscape:    Matrix of heights of cells in space
+            
+        Returns:
+            Returns if applicable:
+            :int n1:            cell above examined cell.
+            :int n2:            cell to right of examined cell.
+            :int n3:            cell below examined cell.
+            :int n4:            to cell to left of examined cell.
         """
+        
         i,j = self.getPosition()
         # TRY EXCEPT BLOCK TO ATTEMPT TO ASSIGN NEIGHBOR LOCATIONS
         try:
@@ -118,9 +189,11 @@ class Cell():
             n4 = landscape[i,j-1].getPosition()
         except:
             IndexError
-            # Build case for each border area, upper/lower left corner, upper/lower right corner
+        
+        # Build case for each border area:
+        # upper/lower left corner, upper/lower right corner
         # All Four borders
-
+        
         # Upper Left Corner (No n1 or n4)
         if i == 0 and j == 0:
             return(n2,n3)
@@ -166,6 +239,20 @@ class Cell():
         
     # Set dz values between site and neighbouring nodes
     def setDz(self,landscape):
+        """
+        Returns topographical distance between examined cell and its neighbors.
+        
+        Parameters:
+            :list landscape:        Matrix of heights of cells in space
+            
+        Returns:
+            Returns when applicable:
+            :float self.dz1:          Distance from examined to cell below
+            :float self.dz2:          Distance from examined to cell above
+            :float self.dz3:          Distance from examined to cell to right
+            :float self.dz4:          Distance from examined to cell to left.    
+        """
+        
         #INITIALIZD DELZ AS NONE
         self.dz2 = None
         self.dz4 = None
@@ -190,8 +277,15 @@ class Cell():
 
     def getDzSum(self,landscape):
         """
-        Get sum of height differences from neighbor of current fire cell
+        Get sum of height differences from neighbor of current fire cell.
+        
+        Parameters:
+            :int landscape:         Matrix of heights of cells in space
+            
+        Returns:
+            :float sumDz:           Sum of height differences.
         """
+        
         nbs = self.getN(landscape)
         zs = []
         for n in nbs:
@@ -207,7 +301,13 @@ class Cell():
         
                     
 def getStates(landscape):
-    """ RETURN ARRAY WITH THE STATE OF EVERY SITE IN LANDSCAPE"""
+    """
+    Returns list with state of every cell / position in landscape.
+    
+    Returns:
+        :list state_map: List of states of every cell / position in landscape.
+    """
+    
     state_map = np.zeros([len(landscape), len(landscape)])
     for i in landscape:
         for j in i:
@@ -217,7 +317,15 @@ def getStates(landscape):
 
 def max_risk_pos(landscape, potential_fire_sites,place):
     """
-        MAX_RISK_POS: calculates the riskiest site for the agent to move to
+    Determines riskiest site for agent to move to.
+    
+    Parameters:
+        :list landscape:        Matrix of heights of cells in space
+        :list potential_fire_sites:     list of  potential fire sites.
+        :bool place:            Boolean referencing most risky site
+        
+    Returns:
+        :list riskiest:         List of riskiest sites.
     """
     #store a list of risks:
     risks = []
@@ -239,9 +347,14 @@ def max_risk_pos(landscape, potential_fire_sites,place):
     
 def get_fire_sites(landscape):
     """
-    Retrieve list of sites that are on fire
-    
+    Retrieve list of sites that are on fire.
+    Parameters:
+        :list landscape:        Matrix of heights of cells in space
+        
+    Returns:
+        :list fire_sites:       Positions that are on fire.
     """
+    
     fire_sites = []
     for i in range(len(landscape)):
         for j in range(len(landscape)):
@@ -254,8 +367,15 @@ def get_fire_sites(landscape):
 # THIS IS WHAT WE WILL NEED TO CHANGE FOR THE EC PROJECT! 
 def update_p_fire(landscape,gamma,zMax):
     """
-    UPDATE RISK OF EVERY CELL IN THE LANDSCAPE 
+    Update risk of every cell in the landscape.
+    
+    Parameters:
+        :list landscape:        Matrix of heights of cells in space
+        :float gamma:           Statistical function parameter
+        :float zMax:            Maximum height in landscape.
     """
+    
+    
     for i in landscape:
         for j in i:
             # ONLY UPDATE IF CELL IS A TREE
@@ -282,16 +402,18 @@ def fire_init(landscape,gamma, zMax,threshold,init_time):
     Description:
         Main function that progresses simulation over time.
     
-    Inputs:
-        landscape : Matrix of heights of cells in space
-        gamma : value between 0,1 that serves as a weight for the importance of height
-        zMax : maximum height in current lansdcape
-        threshold: time for fire cells to expire
-        init_time: amount of time to run the simulation 
-    Outputs:
-        stateMaps : a state matrix at each time step from the simulation
+    Parameters:
+        :list landscape :   Matrix of heights of cells in space
+        :float gamma:       value between 0,1 that serves as a weight for the 
+                            importance of height
+        :zMax :             maximum height in current lansdcape
+        :int threshold:     time for fire cells to expire
+        :int init_time:     amount of time to run the simulation 
     
-    sample call:
+    Returns:
+        :list stateMaps : a state matrix at each time step from the simulation
+    
+    Sample call:
         fire_init(landscape,8,5,20)
      """
      
