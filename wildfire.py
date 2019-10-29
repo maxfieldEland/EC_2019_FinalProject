@@ -35,43 +35,12 @@ def output_state_maps(z_vals, state_maps, dirname='gif_fire'):
         plt.close(fig)
 
 
-# THIS IS WHAT WE WILL NEED TO CHANGE FOR THE EC PROJECT!
-def update_p_fire(landscape, gamma, zMax):
-    """
-    Update risk of every cell in the landscape.
-
-    Parameters:
-        :list landscape:        Matrix of heights of cells in space
-        :float gamma:           Statistical function parameter
-        :float zMax:            Maximum height in landscape.
-    """
-
-    for i in landscape:
-        for j in i:
-            # ONLY UPDATE IF CELL IS A TREE
-            if j.state == 2:
-                # GET STATES OF BORDERS SITES NEIGHBORS
-                nStates = j.getNState(landscape)
-                # GET SUM OF DELTA Z
-                dzSum = j.getDzSum(landscape)
-                nF = Counter(nStates)
-                nF = nF[1]
-                nS = len(nStates)
-                # ASSIGN RISK
-                if dzSum == 0:
-                    dzSum = 1
-                # TODO FIX THIS!!!!! PROBABILITY FUNCTION WILL BE TUNED FROM GP
-                j.risk = gamma + (1 - gamma) * (dzSum) / (nS * 2)  # j.maxDz)
-            # IF CELL IS ALREADY ON FIRE, RISK IS ZERO
-            else:
-                j.risk = 0
-
-
 def calc_prob_fire(cell, neighbors, gamma):
     '''
-
-    :param cell: ndarray of border cell data
-    :param neighbors: ndarray of shape (n_neighbors, n_features)
+    Return the probability that cell catches on fire.
+    :param cell: ndarray of shape (n_features,) containing cell values
+    :param neighbors: ndarray of shape (n_neighbors, n_features) containing
+                      the landscape values of the neighbors of cell
     :param float gamma: value between 0,1 that serves as a weight for the
                         importance of height
     :return: the probability that the cell catches fire
@@ -185,13 +154,13 @@ def simulate_fire(landscape, gamma, max_time, fire_func):
 
 
 def main():
+    # read landscape and simulation time
     landscape_file = sys.argv[1] # landscape raster file (height of land)
     time_steps = int(sys.argv[2]) # simulation time steps
 
+    # make landscape
     z_vals = np.load(landscape_file)
     states = np.full(z_vals.shape, S_TREE, dtype=np.float)
-
-    # create a layered landscape.
     landscape = np.stack([states, z_vals], axis=2)
 
     # START FIRE IN CENTER OF LANDSACPE
@@ -202,6 +171,7 @@ def main():
     # simulate a fire
     state_maps = simulate_fire(landscape, .7, time_steps, calc_prob_fire)
 
+    # convert the landscape state over time to images and save.
     output_state_maps(z_vals, state_maps)
 
 
@@ -209,11 +179,6 @@ if __name__ == '__main__':
     main()
 
 
-# states = np.full((3, 3), 2)
-# zs = np.random.random((3, 3)) * 5
-# landscape = np.stack([states, zs], axis=S_TREE)
-# # make a small fire
-# landscape[(1, 1), (1, 2), (L_STATE, L_STATE)] = S_FIRE
 
 
 
