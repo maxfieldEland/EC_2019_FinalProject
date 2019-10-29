@@ -15,7 +15,7 @@ import sys
 S_FIRE = 1
 S_TREE = 2
 
-# Landscape layers
+# Landscape Layers, analogous to channels in deep neural network image models
 L_STATE = 0
 L_Z = 1
 
@@ -153,15 +153,20 @@ def simulate_fire(landscape, gamma, max_time, fire_func):
     return state_maps
 
 
+def make_landscape(landscape_filename):
+    z_vals = np.load(landscape_filename)
+    states = np.full(z_vals.shape, S_TREE, dtype=np.float)
+    landscape = np.stack([states, z_vals], axis=2)
+    return landscape
+
+
 def main():
     # read landscape and simulation time
     landscape_file = sys.argv[1] # landscape raster file (height of land)
     time_steps = int(sys.argv[2]) # simulation time steps
 
     # make landscape
-    z_vals = np.load(landscape_file)
-    states = np.full(z_vals.shape, S_TREE, dtype=np.float)
-    landscape = np.stack([states, z_vals], axis=2)
+    landscape = make_landscape(landscape_file)
 
     # START FIRE IN CENTER OF LANDSACPE
     i = landscape.shape[0] // 2

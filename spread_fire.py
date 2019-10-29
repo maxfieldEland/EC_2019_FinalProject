@@ -454,52 +454,60 @@ def fire_init(landscape,gamma, zMax,threshold,init_time):
         # UPDATE RISK VALUES FOR ALL CELLS IN LANDSCAPE
         update_p_fire(landscape,gamma,zMax)
         stateMaps.append(getStates(landscape))
-    return(stateMaps)              
-    
+    return(stateMaps)
 
 
+def make_landscape(landscape_file):
+    bowlSmall = np.load(landscape_file)
+    # initialize contained
+    contained = False
 
-# TEST CASE ON PERLIN NOISE LANDSCAPE
-landscape_file = sys.argv[1]
-time_steps = int(sys.argv[2])
+    zVals = bowlSmall
+    N = len(zVals)
+    landscape = np.ndarray([N, N], dtype=Cell)
+    for i, ik in enumerate(zVals):
+        for j, jk in enumerate(ik):
+            z = zVals[i, j]
+            a = Cell(i, j, z, 2)
+            landscape[i, j] = a
 
+    # SET HEIGHTS OF CELLS
+    for i in list(range(len(landscape))):
+        for j in list(range(len(landscape))):
+            landscape[i][j].setDz(landscape)
 
-bowlSmall = np.load(landscape_file)
-# initialize contained
-contained = False
-
-zVals = bowlSmall
-N = len(zVals)
-landscape = np.ndarray([N,N],dtype = Cell)
-for i,ik in enumerate(zVals):
-    for j,jk in enumerate(ik):
-        z = zVals[i,j]
-        a = Cell(i,j,z,2)
-        landscape[i,j] = a
-
-# SET HEIGHTS OF CELLS
-for i in list(range(len(landscape))):
-            for j in list(range(len(landscape))):
-                landscape[i][j].setDz(landscape)
-                
-#initialize fire cluster, determine how many time steps we want the fire to run 
-                
-stateMaps = fire_init(landscape,.7,4,5,time_steps)
-#propogate fire
+    return landscape
 
 
-try:
-    os.mkdir("gif_fire")
-except:
-    FileExistsError
-    
-for i,frame in enumerate(stateMaps):
-    fig, ax = plt.subplots(figsize=(15, 10))
-    cmap = colors.ListedColormap(['red', 'green'])
-    cax = ax.matshow(frame,cmap = cmap)
-    plt.contour(zVals, colors = "b")
-    figname = "gif_fire/{}.png".format(i)
+def main():
+    # TEST CASE ON PERLIN NOISE LANDSCAPE
+    landscape_file = sys.argv[1]
+    time_steps = int(sys.argv[2])
 
-    plt.savefig(figname)
-    plt.close(fig)
+    landscape = make_landscape(landscape_file)
+
+    # initialize fire cluster, determine how many time steps we want the fire to run
+
+    stateMaps = fire_init(landscape, .7, 4, 5, time_steps)
+    # propogate fire
+
+    try:
+        os.mkdir("gif_fire")
+    except:
+        FileExistsError
+
+    for i, frame in enumerate(stateMaps):
+        fig, ax = plt.subplots(figsize=(15, 10))
+        cmap = colors.ListedColormap(['red', 'green'])
+        cax = ax.matshow(frame, cmap=cmap)
+        plt.contour(zVals, colors="b")
+        figname = "gif_fire/{}.png".format(i)
+
+        plt.savefig(figname)
+        plt.close(fig)
+
+
+if __name__ == '__main__':
+    main()
+
 
