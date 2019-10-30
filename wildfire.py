@@ -6,10 +6,10 @@ A landscape is a ndarray containing a layer for every feature -- cell state, hei
 
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
+from sklearn.metrics import jaccard_score
 import numpy as np
 from pathlib import Path
 import sys
-
 
 # Cell States
 S_FIRE = 1
@@ -149,7 +149,6 @@ def simulate_fire(landscape, gamma, max_time, fire_func):
 
         # record the current state of the landscape
         state_maps.append(landscape[:, :, L_STATE].copy())
-
     return state_maps
 
 
@@ -160,11 +159,48 @@ def make_landscape(landscape_filename):
     return landscape
 
 
+def loss_function(predicted, truth):
+    """
+    Calculate loss of the full simulationq based on the Jaccard Index
+    
+    Must not count non fire space towards correct classifications
+    
+    Sample call:
+        loss_function(predicted, truth)
+   
+    :param predicted : the e nxn matrix representing the states of each cell in the landscape at the final iteration of the fire simulation.
+    :param true : the matrix representing the ground truth states of each cell in the landscape
+        
+  
+    :return loss : the loss of the resulting set of state classifications
+        
+    """
+    
+    # convert matrices to set of indeces, enumerate indeces, perform intersection over union on the two sets
+    num_cells = predicted.size
+    predicted_array = np.reshape(predicted,num_cells)
+    true_array = np.reshape(truth,num_cells)
+    
+    # only consider the sites that have the possibility of catching fire
+    fire_site_idxs = np.where(((true_array == 1) | (true_array == 2)))
+    
+    true_fires = true_array[fire_site_idxs]
+    predicted_fires = predicted_array[fire_site_idxs]
+
+    print(true_fires)
+    print(predicted_fires)
+    IoU = jaccard_score(true_fires, predicted_fires)
+    
+    return(IoU)
+    
+
 def main():
     # read landscape and simulation time
     landscape_file = sys.argv[1] # landscape raster file (height of land)
     time_steps = int(sys.argv[2]) # simulation time steps
-
+    ground_truth = np.load(sys.argv[3]) # ground truth state raster
+    
+    z_vals = np.load(landscape_file)
     # make landscape
     landscape = make_landscape(landscape_file)
 
@@ -178,7 +214,11 @@ def main():
 
     # convert the landscape state over time to images and save.
     output_state_maps(z_vals, state_maps)
-
+    
+    # final predicted state_map
+    predicted = state_maps[-1]
+    # calculate loss
+    loss = loss_function(predicted, ground_truth)
 
 if __name__ == '__main__':
     main()
