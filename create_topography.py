@@ -14,6 +14,7 @@ from skimage.measure import perimeter, label
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 
+
 def fade(t):
     """
     Fade function to generate perlin noise_type
@@ -27,8 +28,11 @@ def fade(t):
 
     return 6*t**5 - 15*t**4 + 10* t**3
 
-def lerp(a,b,X):
+
+def lerp(a, b, X):
     return a + X * (b - a)
+
+
 class Landscape(object):
     """
     A landscape representing the heights of each cell.
@@ -216,6 +220,7 @@ class Landscape(object):
             #calculate heights at each site (centered about Z= f + 1):
             Z = ((f*(X + Y) * np.exp(-f*(X**2 + Y**2)) + 1) *f + f) + 1
             self.top = Z
+
         if noise == 'Perlin':
 
             for j in range(self.L):

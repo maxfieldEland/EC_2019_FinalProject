@@ -11,13 +11,28 @@ import numpy as np
 from pathlib import Path
 import sys
 
+
 # Cell States
 S_FIRE = 1
 S_TREE = 2
 
 # Landscape Layers, analogous to channels in deep neural network image models
-L_STATE = 0
-L_Z = 1
+L_STATE = 0  # burn/forest state
+L_Z = 1  # elevation
+L_TEMP = 2  # temperature
+L_HUM = 3  # humidity
+L_WN = 4  # north component of wind speed vector
+L_WE = 4  # east component of wind speed vector
+
+
+def show_landscape(landscape):
+    z = landscape[:, :, L_Z]
+    frame = landscape[:, :, L_STATE]
+    fig, ax = plt.subplots(figsize=(15, 10))
+    cmap = colors.ListedColormap(['red', 'green'])
+    ax.matshow(frame, cmap=cmap)
+    plt.contour(z, colors="b")
+    plt.show()
 
 
 def output_state_maps(z_vals, state_maps, dirname='gif_fire'):
@@ -35,29 +50,44 @@ def output_state_maps(z_vals, state_maps, dirname='gif_fire'):
         plt.close(fig)
 
 
-def calc_prob_fire(cell, neighbors, gamma):
-    '''
-    Return the probability that cell catches on fire.
-    :param cell: ndarray of shape (n_features,) containing cell values
-    :param neighbors: ndarray of shape (n_neighbors, n_features) containing
-                      the landscape values of the neighbors of cell
-    :param float gamma: value between 0,1 that serves as a weight for the
-                        importance of height
-    :return: the probability that the cell catches fire
-    '''
-    if cell[L_STATE] != S_TREE:
-        return 0  # only trees catch fire
-    else:
-        # sum the difference in height between cell and fire neighbors
-        dz_sum = np.sum(neighbors[neighbors[:, L_STATE] == S_FIRE, L_Z] - cell[L_Z])
-        if dz_sum == 0:
-            dz_sum = 1
+def make_totalistic_prob_func(func):
+    def func(neighborhood):
+        return 1.0
 
-        num_neighbors = neighbors.shape[0]
-        prob = gamma + (1 - gamma) * dz_sum / (num_neighbors * 2)
-        # assert prob <= 1
-        # print(prob)
-        return prob
+    return func
+
+
+def make_calc_prob_fire(gamma):
+    '''
+    :param float gamma: value between 0,1 that serves as a weight for the
+                    importance of height
+    '''
+    def func(neighborhood):
+
+        '''
+        Return the probability that cell catches on fire.
+        :param neighborhood: ndarray of shape (n_neighborhood, n_features) containing
+                          the landscape values of the cells of the neighborhood.
+        :return: the probability that the cell catches fire
+        '''
+        cell = neighborhood[0, :]
+        neighbors = neighborhood[1:, :]
+
+        if cell[L_STATE] != S_TREE:
+            return 0  # only trees catch fire
+        else:
+            # sum the difference in height between cell and fire neighbors
+            dz_sum = np.sum(neighbors[neighbors[:, L_STATE] == S_FIRE, L_Z] - cell[L_Z])
+            if dz_sum == 0:
+                dz_sum = 1
+
+            num_neighbors = neighbors.shape[0]
+            prob = gamma + (1 - gamma) * dz_sum / (num_neighbors * 2)
+            # assert prob <= 1
+            # print(prob)
+            return prob
+
+    return func
 
 
 def get_neighbors(landscape):
@@ -72,12 +102,13 @@ def get_neighbors(landscape):
         nbs = landscape[neighbors[row, col]]
 
     :param landscape: a 3d ndarray. The first two dims are row and column. The 3rd dim is cell data.
-    :return: a 2d ndarray containing integer indices tuples. Each tuple of indices is the indices of the neighbors of that cell.
+    :return: a 2d ndarray containing integer indices tuples. Each tuple of indices is the indices of the
+     neighbors of that cell.
     '''
     # get the integer index of every row and column
     # shape: (2, nrows, ncols)
     # e.g. for a 2x2 landscape: idx = array([[[0, 0], [1, 1]], [[0, 1], [0, 1]]])
-    # so element (0, 1, 1) contains the row index for the 2nd row and second column: 1
+    # so element (0, 1, 1) contains the row index for the 2nd row and 2nd column: 1
     idx = np.indices(landscape.shape[:2])
     # the neighbor to the north for the top row is padded to -1 to indicate no neighbor
     # otherwise the neighbor is the idx of the cell in the row above
@@ -86,7 +117,7 @@ def get_neighbors(landscape):
     south = np.pad(idx[:, 1:, :], ((0, 0), (0, 1), (0, 0)), mode='constant', constant_values=-1)
     west = np.pad(idx[:, :, :-1], ((0, 0), (0, 0), (1, 0)), mode='constant', constant_values=-1)
     east = np.pad(idx[:, :, 1:], ((0, 0), (0, 0), (0, 1)), mode='constant', constant_values=-1)
-    # smush all 4 neighbors together
+    # smush the cell and all 4 neighbors together
     stacked = np.stack([north, east, south, west], axis=3)
     # convert the north, east, south, west neighbors into a tuple of row indices and column indices
     # suitable for advanced integer indexing
@@ -96,10 +127,53 @@ def get_neighbors(landscape):
             # filter out out-of-bounds neighbors
             n_idx = (stacked[0, i, j][stacked[0, i, j] >= 0], stacked[1, i, j][stacked[1, i, j] >= 0])
             neighbors[i, j] = n_idx
+
     return neighbors
 
 
-def simulate_fire(landscape, gamma, max_time, fire_func):
+def get_neighborhoods(landscape):
+    '''
+    Figure out the integer indices of the von Neumann neighborhood of every cell in the 2d landscape.
+    A neighborhood contains the cell and the adjacent cells.
+    Cells in corners only have 2 neighbors and cells on edges have on 3 neighbors. Construct a 2d array, where
+    each element is the integer indices of the cells in the neighborhood.
+
+    Usage:
+        neighborhoods = get_neighborhoods(landscape)
+        # each row contains the landscape values of a cell in the neighborhood at (row, col).
+        nbs = landscape[neighborhoods[row, col]]
+
+    :param landscape: a 3d ndarray. The first two dims are row and column. The 3rd dim is cell data.
+    :return: a 2d ndarray containing integer indices tuples. Each tuple of indices is the indices of the
+     cells in the neighborhood.
+    '''
+    # get the integer index of every row and column
+    # shape: (2, nrows, ncols)
+    # e.g. for a 2x2 landscape: idx = array([[[0, 0], [1, 1]], [[0, 1], [0, 1]]])
+    # so element (0, 1, 1) contains the row index for the 2nd row and 2nd column: 1
+    idx = np.indices(landscape.shape[:2])
+    # the neighbor to the north for the top row is padded to -1 to indicate no neighbor
+    # otherwise the neighbor is the idx of the cell in the row above
+    # e.g. array([[[-1, -1], [ 0,  0]], [[-1, -1], [ 0,  1]]])
+    north = np.pad(idx[:, :-1, :], ((0, 0), (1, 0), (0, 0)), mode='constant', constant_values=-1)
+    south = np.pad(idx[:, 1:, :], ((0, 0), (0, 1), (0, 0)), mode='constant', constant_values=-1)
+    west = np.pad(idx[:, :, :-1], ((0, 0), (0, 0), (1, 0)), mode='constant', constant_values=-1)
+    east = np.pad(idx[:, :, 1:], ((0, 0), (0, 0), (0, 1)), mode='constant', constant_values=-1)
+    # smush the cell and all 4 neighbors together
+    stacked = np.stack([idx, north, east, south, west], axis=3)
+    # convert the north, east, south, west neighbors into a tuple of row indices and column indices
+    # suitable for advanced integer indexing
+    neighborhoods = np.empty(landscape.shape[:2], dtype=object)
+    for i in range(neighborhoods.shape[0]):
+        for j in range(neighborhoods.shape[1]):
+            # filter out out-of-bounds neighbors
+            n_idx = (stacked[0, i, j][stacked[0, i, j] >= 0], stacked[1, i, j][stacked[1, i, j] >= 0])
+            neighborhoods[i, j] = n_idx
+
+    return neighborhoods
+
+
+def simulate_fire(landscape, max_time, fire_func):
     """
     Simulate a fire spreading over time.
     Sample call:
@@ -107,14 +181,13 @@ def simulate_fire(landscape, gamma, max_time, fire_func):
 
     :param ndarray landscape: 3 dimensional array containing the values (axis 2)
                               at each position (axis 0 and 1).
-    :param float gamma: value between 0,1 that serves as a weight for the
-                            importance of height
     :param float z_max : maximum height in current landscape
     :param int max_time:     amount of time to run the simulation
     :return list state_maps: a state matrix at each time step from the simulation
     """
     # neighbors[i, j] contain the indices of the neighbors of cell i,j.
-    neighbors = get_neighbors(landscape)
+    # neighbors = get_neighbors(landscape)
+    neighborhoods = get_neighborhoods(landscape)
 
     # Store the initial state of the landscape
     state_maps = [landscape[:, :, L_STATE].copy()]
@@ -141,7 +214,8 @@ def simulate_fire(landscape, gamma, max_time, fire_func):
         for i in range(border_size):
             row = border_idx[0][i]
             col = border_idx[1][i]
-            border_probs[i] = fire_func(landscape[row, col], landscape[neighbors[row, col]], gamma)
+            # border_probs[i] = fire_func(landscape[row, col], landscape[neighbors[row, col]])
+            border_probs[i] = fire_func(landscape[neighborhoods[row, col]])
 
         # spread fire
         border_fire = border_probs > np.random.random(border_size)
@@ -156,6 +230,18 @@ def make_landscape(landscape_filename):
     z_vals = np.load(landscape_filename)
     states = np.full(z_vals.shape, S_TREE, dtype=np.float)
     landscape = np.stack([states, z_vals], axis=2)
+    return landscape
+
+
+def make_landscape_from_dir(dn):
+    dn = Path(dn)
+    z = np.load(dn / 'topology.npy')
+    temp = np.load(dn / 'temperature.npy')
+    hum = np.load(dn / 'humidity.npy')
+    wind_north = np.load(dn / 'wind_north.npy')
+    wind_east = np.load(dn / 'wind_east.npy')
+    states = np.full(z.shape, S_TREE, dtype=np.float)
+    landscape = np.stack([states, z, temp, hum, wind_north, wind_east], axis=2)
     return landscape
 
 
@@ -191,7 +277,7 @@ def loss_function(predicted, truth):
     print(predicted_fires)
     IoU = jaccard_score(true_fires, predicted_fires)
     
-    return(IoU)
+    return IoU
     
 
 def main():
@@ -210,7 +296,8 @@ def main():
     landscape[i, j, L_STATE] = S_FIRE
 
     # simulate a fire
-    state_maps = simulate_fire(landscape, .7, time_steps, calc_prob_fire)
+    gamma = 0.7  # gamma: value between 0,1 that serves as a weight for the importance of height
+    state_maps = simulate_fire(landscape, time_steps, make_calc_prob_fire(gamma))
 
     # convert the landscape state over time to images and save.
     output_state_maps(z_vals, state_maps)
@@ -219,6 +306,7 @@ def main():
     predicted = state_maps[-1]
     # calculate loss
     loss = loss_function(predicted, ground_truth)
+
 
 if __name__ == '__main__':
     main()
