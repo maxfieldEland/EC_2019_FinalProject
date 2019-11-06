@@ -108,8 +108,12 @@ def make_initial_and_final_state(landscape_dir='data/synthetic_example', max_tim
     wf.show_landscape(init_landscape)
     wf.show_landscape(final_landscape)
 
+    print('loss_function')
     print(wf.loss_function(wf.get_state_layer(final_landscape), wf.get_state_layer(final_landscape)))
     print(wf.loss_function(wf.get_state_layer(init_landscape), wf.get_state_layer(final_landscape)))
+    print('iou_fitness')
+    print(wf.iou_fitness(final_landscape, final_landscape))
+    print(wf.iou_fitness(final_landscape, init_landscape))
 
 
 def main(*args):

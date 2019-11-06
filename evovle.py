@@ -12,6 +12,7 @@ Inputs:
 '''
 
 import argparse
+from copy import deepcopy
 from deap import base
 from deap import creator
 from deap import tools
@@ -23,6 +24,9 @@ import networkx as nx
 import numpy as np
 import operator
 import random
+
+from wildfire import L_Z, L_FIRE, L_TREE, L_HUM, L_TEMP, L_WE, L_WN
+from wildfire import simulate_fire, iou_fitness
 
 
 def plot_tree(tree):
@@ -49,11 +53,59 @@ def protectedDiv(left, right):
         return 1
 
 
-def main():
+def make_prob_fire(individual, toolbox):
+    func = toolbox.compile(individual)
+
+    def prob_func(neighborhood):
+        # ignore wind for now
+        cell = neighborhood[0, :-2] # (fire, tree, z, temp, hum)
+        neighbors = neighborhood[1:, :]
+        mean_temp = neighborhood[:, L_TEMP].mean()
+        mean_hum = neighborhood[:, L_HUM].mean()
+        # mean_wn = neighborhood[:, L_WN].mean()
+        # mean_we = neighborhood[:, L_WE].mean()
+        delta_z = neighborhood[:, L_Z] - cell[L_Z]  # the vertical distance from cell to neighbor
+        # fire burns uphill faster, so weight fires below cell more and fires above cell less.
+        mean_weighted_fire = np.mean(neighborhood[:, L_FIRE] * np.exp(-delta_z))
+        # the sum of the delta_z of neighbors that are on fire. I'm still trying to figure out what this means.
+        dz_sum = np.sum(neighbors[neighbors[:, L_FIRE] == 1, L_Z] - cell[L_Z])
+        args = (*cell, mean_temp, mean_hum, mean_weighted_fire, dz_sum)
+        try:
+            return func(*cell, mean_temp, mean_hum, mean_weighted_fire, dz_sum)
+        except ValueError:
+            print('func:', individual)
+            print('func args:', args)
+            raise
+
+    return prob_func
+
+
+def main(init_landscape_path, final_landscape_path, max_time):
+    # questions:
+    # What is the right range and distribution for constants? (No fancy constant optimization like in Eureka)
+    # How is max_time chosen (co-evolved?)
+
+    # Issue:
+    # Wind and neighborhoods. B/c neighborhood omits out-of-bounds neighbors, it is impossible to say which neighbor in
+    # the neighborhood corresponds to the north neighbor of a cell. So if the wind is blowing south, there is no
+    # way to know that it is blowing the fire from the north southward.
+
+    # Load data
+    init_landscape = np.load(init_landscape_path)
+    final_landscape = np.load(final_landscape_path)
+    max_time = int(max_time)
+
+    # Hyperparameters
+    seed = 1
+    eph_const_min = -10
+    eph_const_max = 10
+    eph_const_sigma = 1
+    pop_size = 100  # 300
 
     # The primitives of the tree and their arities.
-    pset = gp.PrimitiveSet("main", 1)
-    pset.renameArguments(ARG0="x")
+    pset = gp.PrimitiveSet("main", 9, prefix='x')
+    pset.renameArguments(x0='fire', x1='tree', x2='z', x3='temp', x4='hum',
+                         x5='mean_temp', x6='mean_hum', x7='mean_weighted_fire', x8='dz_sum')
     pset.addPrimitive(operator.add, 2)
     pset.addPrimitive(operator.sub, 2)
     pset.addPrimitive(operator.mul, 2)
@@ -61,8 +113,11 @@ def main():
     pset.addPrimitive(operator.neg, 1)
     pset.addPrimitive(math.cos, 1)
     pset.addPrimitive(math.sin, 1)
-    # what about e^x and log(x)?
-    pset.addEphemeralConstant("rand101", lambda: random.randint(-1, 1))
+    # Issue: log fails when passed negative numbers.
+    # pset.addPrimitive(math.log, 1)
+    # These generate constants to be inserted into trees
+    pset.addEphemeralConstant("randunif", lambda: random.random() * (eph_const_max - eph_const_min) + eph_const_min)
+    pset.addEphemeralConstant("randnorm", lambda: np.random.randn() * eph_const_sigma)
 
     # Define an individual
     creator.create("FitnessMax", base.Fitness, weights=(1.0,))
@@ -74,15 +129,15 @@ def main():
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("compile", gp.compile, pset=pset)
 
-    def evalSymbReg(individual, points):
-        # Transform the tree expression in a callable function
-        func = toolbox.compile(expr=individual)
-        # Evaluate the mean squared error between the expression
-        # and the real function : x**4 + x**3 + x**2 + x
-        sqerrors = ((func(x) - x ** 4 - x ** 3 - x ** 2 - x) ** 2 for x in points)
-        return math.fsum(sqerrors) / len(points),
+    def evalCA(individual, init_landscape, final_landscape, max_time):
 
-    toolbox.register("evaluate", evalSymbReg, points=[x / 10. for x in range(-10, 10)])
+        prob_func = make_prob_fire(individual, toolbox)
+        pred_landscape = simulate_fire(deepcopy(init_landscape), max_time, prob_func)
+        fitness = iou_fitness(final_landscape, pred_landscape)
+        return (fitness,)  # return a tuple
+
+    toolbox.register("evaluate", evalCA, init_landscape=init_landscape,
+                     final_landscape=final_landscape, max_time=max_time)
     toolbox.register("select", tools.selTournament, tournsize=3)
     toolbox.register("mate", gp.cxOnePoint)
     toolbox.register("expr_mut", gp.genFull, min_=0, max_=2)
@@ -99,7 +154,7 @@ def main():
     mstats.register("min", np.min)
     mstats.register("max", np.max)
 
-    pop = toolbox.population(n=300)
+    pop = toolbox.population(n=pop_size)
     hof = tools.HallOfFame(1)
     pop, log = algorithms.eaSimple(pop, toolbox, 0.5, 0.1, 40, stats=mstats, halloffame=hof, verbose=True)
     tree = gp.PrimitiveTree(hof[0])
@@ -109,7 +164,6 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('func', help='a function to run')
     parser.add_argument('args', metavar='ARG', nargs='*', help='any arguments for the function')

@@ -267,6 +267,25 @@ def simulate_fire(landscape, max_time, fire_func, with_state_maps=False):
         return landscape
 
 
+def iou_fitness(true_landscape, pred_landscape):
+    '''
+    Note: This function returns the same results as `loss_function`, taking landscapes instead of
+    state maps to avoid the overhead of creating state maps from landscapes.
+
+    Compute the intersection over union of the true landscape and predicted landscape.
+    Perfect agreement is 1. Complete disagreement is 0.
+    :param true_landscape:
+    :param pred_landscape:
+    :return: the IoU, a float between 0 and 1.
+    '''
+    # only consider sites that can burn (ignore rock, water)
+    trees_or_fire_idx = np.nonzero((true_landscape[:, :, L_FIRE] == 1) | (true_landscape[:, :, L_TREE] == 1))
+    y_true = true_landscape[:, :, L_FIRE][trees_or_fire_idx]
+    y_pred = pred_landscape[:, :, L_FIRE][trees_or_fire_idx]
+    iou = jaccard_score(y_true, y_pred)
+    return iou
+
+
 def loss_function(predicted, truth):
     """
     Calculate loss of the full simulation based on the Jaccard Index
@@ -336,6 +355,8 @@ def main():
     y_pred = get_state_layer(pred_landscape)
     loss = loss_function(y_pred, y_true)
     print('loss:', loss)
+    iou = iou_fitness(final_landscape, pred_landscape)
+    print('iou fitness:', iou)
     show_landscape(final_landscape)
     show_landscape(pred_landscape)
     # convert the landscape state over time to images and save.
