@@ -88,19 +88,19 @@ def make_initial_and_final_state(landscape_dir='data/synthetic_example', max_tim
 
     landscape_path = Path(landscape_dir)
     landscape = wf.make_landscape_from_dir(landscape_path)
-    final_landscape = copy.deepcopy(landscape)
 
     # START FIRE IN CENTER OF LANDSACPE
     i = landscape.shape[0] // 2
     j = landscape.shape[1] // 2
-    landscape[i, j, wf.L_STATE] = wf.S_FIRE
+    landscape[i, j, wf.L_FIRE] = 1
+    landscape[i, j, wf.L_TREE] = 0
     init_landscape = copy.deepcopy(landscape)
 
     # Simulate burn
     max_time = 20
     gamma = 0.7
-    state_maps = wf.simulate_fire(landscape, max_time, wf.make_calc_prob_fire(gamma))
-    final_landscape[:, :, wf.L_STATE] = state_maps[-1]
+    final_landscape, state_maps = wf.simulate_fire(landscape, max_time, wf.make_calc_prob_fire(gamma),
+                                                   with_state_maps=True)
 
     # save initial and final landscapes
     np.save(landscape_path / 'init_landscape.npy', init_landscape)
@@ -108,8 +108,8 @@ def make_initial_and_final_state(landscape_dir='data/synthetic_example', max_tim
     wf.show_landscape(init_landscape)
     wf.show_landscape(final_landscape)
 
-    print(wf.loss_function(final_landscape[:, :, wf.L_STATE], final_landscape[:, :, wf.L_STATE]))
-    print(wf.loss_function(init_landscape[:, :, wf.L_STATE], final_landscape[:, :, wf.L_STATE]))
+    print(wf.loss_function(wf.get_state_layer(final_landscape), wf.get_state_layer(final_landscape)))
+    print(wf.loss_function(wf.get_state_layer(init_landscape), wf.get_state_layer(final_landscape)))
 
 
 def main(*args):
