@@ -1,15 +1,16 @@
-'''
+"""
 wildfire.py contains code for creating a landscape and simulating a forest fire using a cellular automata.
 
 A landscape is a ndarray containing a layer for every feature -- cell state, height, humidity, ...
-'''
+"""
+
+import sys
+import numpy as np
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from sklearn.metrics import jaccard_score
-import numpy as np
-from pathlib import Path
-import sys
 
 
 # Cell States
@@ -71,18 +72,24 @@ def make_landscape_from_dir(dn):
 
 
 def make_totalistic_prob_func(func):
-    '''
+    """
     This function doesn't make sense yet...(e.g. averaging the "state" layer of the neighborhood)
     https://en.wikipedia.org/wiki/Cellular_automaton#Totalistic
-    :param func:
-    :return:
-    '''
+
+    Parameters:
+        :param func:
+        :return:
+    """
     def prob_func(neighborhood):
-        '''
-        :param neighborhood: ndarray of shape (n_neighborhood, n_features) containing
-        the landscape values of the cells of the neighborhood.
-        :return: the probability of the cell (at the center of the neighborhood) transitioning to fire.
-        '''
+        """
+        Parameters:
+            :param neighborhood: ndarray of shape (n_neighborhood, n_features) containing
+            the landscape values of the cells of the neighborhood.
+
+        Returns:
+            :return: the probability of the cell (at the center 
+            of the neighborhood) transitioning to fire.
+        """
         mean_features = np.mean(neighborhood, axis=0)
         return func(mean_features)
 
@@ -90,18 +97,23 @@ def make_totalistic_prob_func(func):
 
 
 def make_calc_prob_fire(gamma):
-    '''
-    :param float gamma: value between 0,1 that serves as a weight for the
-                    importance of height
-    '''
+    """
+    Parameters:
+        :param float gamma: value between 0,1 that 
+        serves as a weight for the importance of height
+    """
     def prob_func(neighborhood):
 
-        '''
+        """
         Return the probability that cell catches on fire.
-        :param neighborhood: ndarray of shape (n_neighborhood, n_features) containing
-        the landscape values of the cells of the neighborhood.
-        :return: the probability that the cell catches fire
-        '''
+
+        Parameters:
+            :param neighborhood: ndarray of shape (n_neighborhood, n_features) containing
+            the landscape values of the cells of the neighborhood.
+
+        Returns:
+            :return: the probability that the cell catches fire
+        """
         #  Neighborhood rows, in order, are (cell, north, east, south, west)
         #  Cells on the edges might not have all 4 neighbors.
         cell = neighborhood[0, :]
@@ -117,15 +129,13 @@ def make_calc_prob_fire(gamma):
 
             num_neighbors = neighbors.shape[0]
             prob = gamma + (1 - gamma) * dz_sum / (num_neighbors * 2)
-            # assert prob <= 1
-            # print(prob)
             return prob
 
     return prob_func
 
 
 def get_neighbors(landscape):
-    '''
+    """
     Figure out the integer indices of the von Neumann neighborhood of every cell in the 2d landscape.
     Cells in corners only have 2 neighbors and cells on edges have on 3 neighbors. Construct a 2d array, where
     each element is the integer indices of the neighboring cells of the element.
@@ -135,10 +145,12 @@ def get_neighbors(landscape):
         # each row contains the landscape values of a neighbor of the cell at (row, col).
         nbs = landscape[neighbors[row, col]]
 
-    :param landscape: a 3d ndarray. The first two dims are row and column. The 3rd dim is cell data.
-    :return: a 2d ndarray containing integer indices tuples. Each tuple of indices is the indices of the
-     neighbors of that cell.
-    '''
+    Parameters:
+        :param landscape: a 3d ndarray. The first two dims are row and column. The 3rd dim is cell data.
+        :return: a 2d ndarray containing integer indices tuples. Each tuple of indices is the indices of the
+         neighbors of that cell.
+    """
+
     # get the integer index of every row and column
     # shape: (2, nrows, ncols)
     # e.g. for a 2x2 landscape: idx = array([[[0, 0], [1, 1]], [[0, 1], [0, 1]]])
@@ -166,7 +178,7 @@ def get_neighbors(landscape):
 
 
 def get_neighborhoods(landscape):
-    '''
+    """
     Figure out the integer indices of the von Neumann neighborhood of every cell in the 2d landscape.
     A neighborhood contains the cell and the adjacent cells.
     Cells in corners only have 2 neighbors and cells on edges have on 3 neighbors. Construct a 2d array, where
@@ -177,10 +189,14 @@ def get_neighborhoods(landscape):
         # each row contains the landscape values of a cell in the neighborhood at (row, col).
         nbs = landscape[neighborhoods[row, col]]
 
-    :param landscape: a 3d ndarray. The first two dims are row and column. The 3rd dim is cell data.
-    :return: a 2d ndarray containing integer indices tuples. Each tuple of indices is the indices of the
-     cells in the neighborhood.
-    '''
+    Parameters:
+        :param landscape: a 3d ndarray. The first two dims are row and column. The 3rd dim is cell data.
+
+    Returns:
+        :return: a 2d ndarray containing integer indices tuples. Each tuple of indices is the indices of the
+         cells in the neighborhood.
+    """
+
     # get the integer index of every row and column
     # shape: (2, nrows, ncols)
     # e.g. for a 2x2 landscape: idx = array([[[0, 0], [1, 1]], [[0, 1], [0, 1]]])
@@ -213,12 +229,16 @@ def simulate_fire(landscape, max_time, fire_func, with_state_maps=False):
     Sample call:
         simulate_fire(landscape, 20, make_calc_prob_fire(0.7))
 
-    :param ndarray landscape: 3 dimensional array containing the values (axis 2)
-                              at each position (axis 0 and 1).
-    :param int max_time:     amount of time to run the simulation
-    :param with_state_maps: if True, return (landscape, state_maps). Otherwise return only the landscape.
-    :return: the final landscape, or the final landscape and a list of state maps.
+    Parameters:
+        :param ndarray landscape: 3 dimensional array containing the values (axis 2)
+                                  at each position (axis 0 and 1).
+        :param int max_time:     amount of time to run the simulation
+        :param with_state_maps: if True, return (landscape, state_maps). Otherwise return only the landscape.
+
+    Returns:
+        :return: the final landscape, or the final landscape and a list of state maps.
     """
+
     # neighbors[i, j] contain the indices of the neighbors of cell i,j.
     # neighbors = get_neighbors(landscape)
     neighborhoods = get_neighborhoods(landscape)
@@ -268,16 +288,21 @@ def simulate_fire(landscape, max_time, fire_func, with_state_maps=False):
 
 
 def iou_fitness(true_landscape, pred_landscape):
-    '''
+    """
     Note: This function returns the same results as `loss_function`, taking landscapes instead of
     state maps to avoid the overhead of creating state maps from landscapes.
 
     Compute the intersection over union of the true landscape and predicted landscape.
     Perfect agreement is 1. Complete disagreement is 0.
-    :param true_landscape:
-    :param pred_landscape:
-    :return: the IoU, a float between 0 and 1.
-    '''
+
+    Parameters:
+        :param true_landscape:
+        :param pred_landscape:
+
+    Returns:
+        :return: the IoU, a float between 0 and 1.
+    """
+
     # only consider sites that can burn (ignore rock, water)
     trees_or_fire_idx = np.nonzero((true_landscape[:, :, L_FIRE] == 1) | (true_landscape[:, :, L_TREE] == 1))
     y_true = true_landscape[:, :, L_FIRE][trees_or_fire_idx]
@@ -295,11 +320,14 @@ def loss_function(predicted, truth):
     Sample call:
         loss_function(predicted, truth)
    
-    :param predicted : the e nxn matrix representing the states of each cell in the landscape at the final iteration of the fire simulation.
-    :param true : the matrix representing the ground truth states of each cell in the landscape
+    Parameters:
+        :param predicted : the e nxn matrix representing the states of each 
+        cell in the landscape at the final iteration of the fire simulation.
+
+        :param true : the matrix representing the ground truth states of each cell in the landscape
         
-  
-    :return loss : the loss of the resulting set of state classifications
+    Returns:
+        :return loss : the loss of the resulting set of state classifications
         
     """
     
@@ -337,11 +365,12 @@ def output_state_maps(z_vals, state_maps, dirname='gif_fire'):
 
 
 def main():
-    '''
+    """
     Simulate a burn starting from the initial landscape, output the state maps, and calculate the loss of
     the simulated burned landscape compared to the final landscape.
     Usage: python wildfire.py data/synthetic_example/init_landscape.npy data/synthetic_example/final_landscape.npy 20
-    '''
+    """
+
     init_landscape_path = sys.argv[1]
     final_landscape_path = sys.argv[2]
     max_time = int(sys.argv[3])
@@ -362,12 +391,5 @@ def main():
     # convert the landscape state over time to images and save.
     output_state_maps(final_landscape[:, :, L_Z], state_maps)
 
-
-
 if __name__ == '__main__':
     main()
-
-
-
-
-

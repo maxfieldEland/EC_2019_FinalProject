@@ -1,15 +1,18 @@
-'''
+"""
 Create synthetic landscapes, including topology, wind, temperature, and precipitation.
-'''
+"""
 
-import argparse
 import copy
+import argparse
+import numpy as np
+import wildfire as wf
+from pathlib import Path
+
+import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from mpl_toolkits.mplot3d import Axes3D
-import matplotlib.pyplot as plt
-import numpy as np
-from pathlib import Path
-import wildfire as wf
+
+
 
 
 def fade(t):
@@ -29,21 +32,23 @@ def fade(t):
 def perlin_raster(n_rows, n_cols, f, noise):
     """
     Generate random 2D maps that mimic spatially smoothed features.
-    :param int n_rows: the number of rows in the map
-    :param int n_cols: the number of columns in the map
-    :param int f: a scale factor and the height displacement (phase
-    displacement shift/ translation).
-    :param str noise: the noise function that defines the deformation
-    of a point across the 2D space. 'Sinosoid': generates a sinosoidal
-    surface centered at f+1. (see:
+
+    Parameters:
+        :param int n_rows: the number of rows in the map
+        :param int n_cols: the number of columns in the map
+        :param int f: a scale factor and the height displacement (phase
+        displacement shift/ translation).
+
+        :param str noise: the noise function that defines the deformation
+        of a point across the 2D space. 'Sinosoid': generates a sinosoidal
+        surface centered at f+1. (see:
     https://docs.scipy.org/doc/scipy/reference/tutorial/interpolate.html)
-    'Saddle'
-        :str Perlin: ?
 
 
-    Returnss:
+    Returns:
         2D ndarray describing height of map
     """
+
     # octaves are the number of waves to combine
     # frequency is the number of oscillations per time step
     # amplitude is the height of any given point on the waveform
@@ -67,6 +72,7 @@ def display_raster(raster):
     """
     Graphically display the raster, e.g. the topography of the map.
     """
+
     n_rows, n_cols = raster.shape
     X, Y = np.mgrid[:n_rows, :n_cols]
 
@@ -76,13 +82,17 @@ def display_raster(raster):
     plt.show()
 
 
-def make_initial_and_final_state(landscape_dir='data/synthetic_example', max_time=20, seed=None):
-    '''
+def make_initial_and_final_state(landscape_dir='data/synth_data/', max_time=20, seed=None):
+    """
     Create a landscape, start an initial fire, simulate a burn for max_time time steps,
     and then save the initial fire and final fire landscapes.
-    :param landscape_path: directory containing landscape layer files
-    :param seed: optional integer seed
-    '''
+
+    Parameters:
+        :param landscape_path: directory containing landscape layer files
+        :param seed: optional integer seed
+
+    """
+
     if seed is not None:
         np.random.seed(int(seed))
 
@@ -117,11 +127,8 @@ def make_initial_and_final_state(landscape_dir='data/synthetic_example', max_tim
 
 
 def main(*args):
-    # raster = perlin_raster(50, 50, f=6, noise='Saddle')
-    # raster = perlin_raster(50, 50, f=6, noise='Perlin')
-    # raster = np.load('data/perlin_50_x_50_100.npy')
     for fn in ('topology.npy', 'wind_speed.npy', 'temperature.npy', 'humidity.npy'):
-        path = Path('data/synthetic_example') / fn
+        path = Path('data/synth_data/') / fn
         raster = np.load(path)
         print(f'{fn} shape: {raster.shape}')
         display_raster(raster)
