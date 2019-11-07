@@ -14,7 +14,7 @@ python mapsynth.py make_initial_and_final_state data/synth_data/plain/ 20
 
 Similarly, here is a sample call to begin the genetic evolution
 
-python evolve.py main data/synth_data/plain/init_landscape.npy /data/synth_data/plain/final_landscape.npy 20
+python evolve.py main data/synth_data/plain/inputs/init_landscape.npy data/synth_data/plain/inputs/final_landscape.npy 20
 
 1st arg: The function called to begin evolution
 2nd arg: The beginning synthetic landscape to build our sim off of

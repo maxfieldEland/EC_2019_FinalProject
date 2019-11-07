@@ -47,14 +47,16 @@ def plot_tree(tree):
 
 
 def protectedDiv(left, right):
-    try:
-        return left / right
-    except ZeroDivisionError:
+    if (right != 0):
+        return (left/right)
+
+    else:
         return 1
 
 
 def make_prob_fire(individual, toolbox):
     func = toolbox.compile(individual)
+    # print(func)
 
     def prob_func(neighborhood):
         # ignore wind for now
@@ -71,8 +73,17 @@ def make_prob_fire(individual, toolbox):
         dz_sum = np.sum(neighbors[neighbors[:, L_FIRE] == 1, L_Z] - cell[L_Z])
         args = (*cell, mean_temp, mean_hum, mean_weighted_fire, dz_sum)
         try:
+            # print("\n\n")
+            # print(func)
+            # print(individual)
+            # print("Cell", *cell)
+            # print("Temp", mean_temp)
+            # print("Hum", mean_hum)
+            # print("MWF", mean_weighted_fire)
+            # print("dz_sum", dz_sum)
             return func(*cell, mean_temp, mean_hum, mean_weighted_fire, dz_sum)
         except ValueError:
+            # print("\n\n")
             print('func:', individual)
             print('func args:', args)
             raise
