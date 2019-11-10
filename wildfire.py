@@ -250,15 +250,17 @@ def simulate_fire(landscape, max_time, fire_func, with_state_maps=False):
     # BEGIN FIRE PROPOGATION
     for t in range(max_time):
 
-        # what cells are trees bordering fire?
+        # what cells are trees that are not on fire but are bordering fire?
         is_tree = landscape[:, :, L_TREE] == 1
-        is_fire = np.zeros((landscape.shape[0] + 2, landscape.shape[1] + 2), dtype=bool)
-        is_fire[1:-1, 1:-1] = landscape[:, :, L_FIRE] == 1
-        is_fire_north = is_fire[:-2, 1:-1]
-        is_fire_south = is_fire[2:, 1:-1]
-        is_fire_east = is_fire[1:-1, 2:]
-        is_fire_west = is_fire[1:-1, :-2]
-        is_border = is_tree & (is_fire_north | is_fire_south | is_fire_east | is_fire_west)
+        is_fire = landscape[:, :, L_FIRE] == 1
+
+        is_fire_padded = np.pad(is_fire, 1, mode='constant', constant_values=False)
+        is_fire_north = is_fire_padded[:-2, 1:-1]  # a fire is north of cell (i, j) if cell (i-1, j) is on fire
+        is_fire_south = is_fire_padded[2:, 1:-1]
+        is_fire_east = is_fire_padded[1:-1, 2:]
+        is_fire_west = is_fire_padded[1:-1, :-2]
+        is_border = is_tree & np.logical_not(is_fire) & (is_fire_north | is_fire_south | is_fire_east | is_fire_west)
+
         # indices as (row_idx, col_idx) tuple
         # e.g. (array([0, 0, 1, 2, 2]), array([1, 2, 0, 1, 2]))
         border_idx = np.nonzero(is_border)
