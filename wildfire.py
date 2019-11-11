@@ -60,7 +60,7 @@ def make_landscape(landscape_filename):
 
 def make_landscape_from_dir(dn):
     dn = Path(dn)
-    z = np.load(dn / 'topology.npy')
+    z = np.load(dn / 'topography.npy')
     temp = np.load(dn / 'temperature.npy')
     hum = np.load(dn / 'humidity.npy')
     wind_north = np.load(dn / 'wind_north.npy')
