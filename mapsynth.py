@@ -1,5 +1,5 @@
 """
-Create synthetic landscapes, including topography, wind, temperature, and precipitation.
+Create synthetic landscapes, including topography, humidity, temperature, wind speed and wind direction.
 
 For each landscape, first a set of layers is generated (one layer for topography, for temperature, etc.).
 Then the layers are stitched into a landscape (3-d ndarray), an initial burn is created, a wildfire
@@ -8,6 +8,7 @@ simulation is run, and then the initial burned landscape and final burned landsc
 
 import argparse
 import copy
+from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
@@ -309,74 +310,57 @@ class Landscape(object):
         plt.show()
 
 
-def make_same_params(L=50, f=10, scale=100):
-    '''
-    Make a list of parameters, one for each layer, for use with make_layers. The L, f, scale
-    params are the same for every layer.
-
-    :param L:
-    :param f:
-    :param scale:
-    :return:
-    '''
-    layers = ['topography', 'temperature', 'humidity', 'wind_north', 'wind_east']
-    return [(name, L, f, scale) for name in layers]
-
-
-def make_layers(path, params):
-    '''
-    For each tuple in params, make a layer. Each tuple is (name, L, f, scale),
-    where name is like 'humidity' or 'temperature'. The L, f, and scale params
-    are used to generate a perlin noise landscape which is saved to a file
-    called {name}.npy inside the directory `path`.
-
-    By using a list of params, it is possible for different layers to have
-     different values for `f` or `scale`.
-
-    :param path: The directory in which to save the layer ndarrays.
-    :param params: a list of parameters, one set of parameters per layer.
-    :return:
-    '''
-    for name, L, f, scale in params:
-        a = Landscape(L=L)
-        a.get_neighbors()
-        a.perlin_terrain(f=f, noise='Perlin', scale=scale, save=False)
-        filename = Path(path) / f'{name}.npy'
-        filename.parent.mkdir(parents=True, exist_ok=True)
-        a.save_topography(filename)
-        # a.display_topography()
-
-
-def make_plain_seeded_landscapes(dir_name, n, L=50, f=10, scale=100):
-    n = int(n)
-    L = int(L)
-    try:
-        f = int(f)
-    except ValueError:
-        f = float(f)
-    scale = int(scale)
-
-    dn = Path(dir_name)
-    for i in range(n):
-        np.random.seed(i)
-        landscape_dir = dn / f'plain_seed_{i}_L_{L}_f_{f}_scale_{scale}'
-        landscape_dir.mkdir(parents=True, exist_ok=True)
-        params = make_same_params(L, f, scale)
-        make_layers(landscape_dir, params)
-
-
-def display_raster(raster):
-    """
-    Graphically display the raster, e.g. the topography of the map.
-    """
-
-    n_rows, n_cols = raster.shape
-    X, Y = np.mgrid[:n_rows, :n_cols]
-
+def display_layer(layer):
+    x, y = np.mgrid[:layer.shape[0], :layer.shape[1]]
     fig = plt.figure(figsize=(8, 6))
     ax = fig.add_subplot(1, 1, 1, projection='3d')
-    surf = ax.plot_surface(X, Y, raster, cmap='Greens')
+    ax.plot_surface(x, y, layer, cmap='Greens')
     plt.show()
+
+
+def make_perlin_layer(L, f, scale, norm=False):
+    '''
+    Return an L x L matrix. Values are centered (more or less) around f. The larger scale is, the closer
+    the values are to f. The values are a smoothed perlin noise surface.
+
+    :param norm: if True, scale the layer values to be from 0 to 1.
+    '''
+    a = Landscape(L=L)
+    a.get_neighbors()
+    a.perlin_terrain(f=f, noise='Perlin', scale=scale, save=False)
+    layer = a.top
+    if norm:
+        layer = layer - np.amin(layer)
+        layer = layer / np.amax(layer)
+
+    return layer
+
+
+def make_landscape_layers(path, L, f, scale):
+    '''
+    :param path: The directory in which to save the layer ndarrays.
+    :return:
+    '''
+    for name in ['topography', 'temperature', 'humidity']:
+        layer = make_perlin_layer(L, f, scale)
+        filename = Path(path) / f'{name}.npy'
+        np.save(filename, layer)
+        # display_layer(layer)
+
+    # wind speed is a random value in [0, f] + perlin noise in [0, wsv]
+    wind_speed_variability = 1  # arbitrary constant
+    layer = np.random.random() * f + make_perlin_layer(L, f, scale, norm=True) * wind_speed_variability
+    filename = Path(path) / f'wind_speed.npy'
+    np.save(filename, layer)
+    # display_layer(layer)
+
+    # wind direction is a random value in [0, 2*pi] + perlin noise ranging from [-wdv, wdv]
+    wind_direction_variability = np.pi / 8  # arbitrary constant
+    layer = np.random.random() * 2 * np.pi
+    layer += make_perlin_layer(L, f, scale, norm=True) * 2 * wind_direction_variability - wind_direction_variability
+    filename = Path(path) / f'wind_direction.npy'
+    np.save(filename, layer)
+    # display_layer(layer)
 
 
 def make_initial_and_final_state(landscape_dir='data/synth_data/', max_time=20, seed=None, display=True):
@@ -416,13 +400,6 @@ def make_initial_and_final_state(landscape_dir='data/synth_data/', max_time=20, 
         wf.show_landscape(init_landscape)
         wf.show_landscape(final_landscape)
 
-    print('loss_function')
-    print(wf.loss_function(wf.get_state_layer(final_landscape), wf.get_state_layer(final_landscape)))
-    print(wf.loss_function(wf.get_state_layer(init_landscape), wf.get_state_layer(final_landscape)))
-    print('iou_fitness')
-    print(wf.iou_fitness(final_landscape, final_landscape))
-    print(wf.iou_fitness(final_landscape, init_landscape))
-
 
 def make_synthetic_dataset(parent_dir, n, L, f, scale, max_time, seed=None):
     try:
@@ -432,6 +409,7 @@ def make_synthetic_dataset(parent_dir, n, L, f, scale, max_time, seed=None):
 
     # create a directory for this dataset based on the parameters
     dn = Path(parent_dir) / f'plain_n_{n}_L_{L}_f_{f}_scale_{scale}_max_time_{max_time}_seed_{seed}'
+    print('dataset directory:', dn)
 
     # seed the RNG to reproduce the same landscapes
     if seed is not None:
@@ -442,17 +420,16 @@ def make_synthetic_dataset(parent_dir, n, L, f, scale, max_time, seed=None):
         padded_i = str(i).zfill(len(str(n)))  # e.g. n=100, i=11, padded_i='011'
         landscape_dir = dn / f'landscape_{padded_i}'
         landscape_dir.mkdir(parents=True, exist_ok=True)
-        params = make_same_params(L, f, scale)
-        make_layers(landscape_dir, params)
+        make_landscape_layers(landscape_dir, L, f, scale)
         make_initial_and_final_state(landscape_dir, max_time, display=False)
 
 
 def main(*args):
     for fn in ('topography.npy', 'wind_speed.npy', 'temperature.npy', 'humidity.npy'):
         path = Path('data/synth_data/') / fn
-        raster = np.load(path)
-        print(f'{fn} shape: {raster.shape}')
-        display_raster(raster)
+        layer = np.load(path)
+        print(f'{fn} shape: {layer.shape}')
+        display_layer(layer)
 
 
 if __name__ == '__main__':
@@ -461,12 +438,12 @@ if __name__ == '__main__':
 
     # add a parser for make_synthetic_dataset
     parser = subparsers.add_parser('make_synthetic_dataset')
-    parser.add_argument('parent_dir', help='The directory in which to create the dataset directory')
-    parser.add_argument('n', type=int, help='The number of landscapes to create')
-    parser.add_argument('L', type=int, help='The length of the sides of the landscape grid')
-    parser.add_argument('f', type=float, help='The average value of the Perlin noise')
-    parser.add_argument('scale', type=int, help='The smoothness of the Perlin noise')
-    parser.add_argument('max_time', type=int, help='The length of time to simulate the fire')
+    parser.add_argument('--parent-dir', help='The directory in which to create the dataset directory')
+    parser.add_argument('-n', type=int, help='The number of landscapes to create')
+    parser.add_argument('-L', type=int, help='The length of the sides of the landscape grid')
+    parser.add_argument('-f', type=float, help='The average value of the Perlin noise')
+    parser.add_argument('--scale', type=int, help='The smoothness of the Perlin noise')
+    parser.add_argument('--max-time', type=int, help='The length of time to simulate the fire')
     parser.add_argument('--seed', type=int, default=0,
                         help='Used to seed the random number generator for reproducibility')
     parser.set_defaults(func=make_synthetic_dataset)
@@ -494,5 +471,7 @@ if __name__ == '__main__':
     # and with a range of values closer to f.
     # make_plain_seeded_landscapes('test_data/plain', n=20, L=50, f=10, scale=100)
 
+    # Usage
     #
-    # python mapsynth make_synthetic_dataset test_data 10 50 10 100 20 1
+    # Make 10 synthetic landscapes with initial and final burns
+    # python mapsynth.py make_synthetic_dataset --parent-dir=test_data -n10 -L50 -f10 --scale=100 --max-time=20 --seed=1

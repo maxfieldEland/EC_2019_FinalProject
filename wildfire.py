@@ -24,8 +24,8 @@ L_TREE = 1  # tree state
 L_Z = 2  # elevation
 L_TEMP = 3  # temperature
 L_HUM = 4  # humidity
-L_WN = 5  # north component of wind speed vector
-L_WE = 6  # east component of wind speed vector
+L_WS = 5  # wind speed
+L_WD = 6  # wind direction
 
 
 def show_landscape(landscape):
@@ -56,11 +56,11 @@ def make_landscape_from_dir(dn):
     z = np.load(dn / 'topography.npy')
     temp = np.load(dn / 'temperature.npy')
     hum = np.load(dn / 'humidity.npy')
-    wind_north = np.load(dn / 'wind_north.npy')
-    wind_east = np.load(dn / 'wind_east.npy')
+    wind_speed = np.load(dn / 'wind_speed.npy')
+    wind_direction = np.load(dn / 'wind_direction.npy')
     tree = np.full(z.shape, 1.0, dtype=np.float)
     fire = np.zeros(z.shape)
-    landscape = np.stack([fire, tree, z, temp, hum, wind_north, wind_east], axis=2)
+    landscape = np.stack([fire, tree, z, temp, hum, wind_speed, wind_direction], axis=2)
     return landscape
 
 
