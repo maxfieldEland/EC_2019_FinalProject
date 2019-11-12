@@ -318,6 +318,17 @@ def display_layer(layer):
     plt.show()
 
 
+def display_layers_from_dir(path):
+    '''
+    Show all the layers in a landscape directory
+    :param path: landscape directory
+    '''
+    for name in ['topography', 'temperature', 'humidity', 'wind_speed', 'wind_direction']:
+        fn = Path(path) / (name + '.npy')
+        layer = np.load(fn)
+        display_layer(layer)
+
+
 def make_perlin_layer(L, f, scale, norm=False):
     '''
     Return an L x L matrix. Values are centered (more or less) around f. The larger scale is, the closer
@@ -455,6 +466,11 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=0,
                         help='Used to seed the random number generator for reproducibility')
     parser.set_defaults(func=make_initial_and_final_state)
+
+    # add a parser for make_initial_and_final_state
+    parser = subparsers.add_parser('display_layers_from_dir')
+    parser.add_argument('path', help='directory containing landscape layers')
+    parser.set_defaults(func=display_layers_from_dir)
 
     args = main_parser.parse_args()
     # print(args)
