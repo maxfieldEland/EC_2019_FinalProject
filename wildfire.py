@@ -51,13 +51,6 @@ def get_state_layer(landscape):
     return state
 
 
-def make_landscape(landscape_filename):
-    z_vals = np.load(landscape_filename)
-    states = np.full(z_vals.shape, S_TREE, dtype=np.float)
-    landscape = np.stack([states, z_vals], axis=2)
-    return landscape
-
-
 def make_landscape_from_dir(dn):
     dn = Path(dn)
     z = np.load(dn / 'topography.npy')
@@ -69,31 +62,6 @@ def make_landscape_from_dir(dn):
     fire = np.zeros(z.shape)
     landscape = np.stack([fire, tree, z, temp, hum, wind_north, wind_east], axis=2)
     return landscape
-
-
-def make_totalistic_prob_func(func):
-    """
-    This function doesn't make sense yet...(e.g. averaging the "state" layer of the neighborhood)
-    https://en.wikipedia.org/wiki/Cellular_automaton#Totalistic
-
-    Parameters:
-        :param func:
-        :return:
-    """
-    def prob_func(neighborhood):
-        """
-        Parameters:
-            :param neighborhood: ndarray of shape (n_neighborhood, n_features) containing
-            the landscape values of the cells of the neighborhood.
-
-        Returns:
-            :return: the probability of the cell (at the center 
-            of the neighborhood) transitioning to fire.
-        """
-        mean_features = np.mean(neighborhood, axis=0)
-        return func(mean_features)
-
-    return prob_func
 
 
 def make_calc_prob_fire(gamma):
@@ -134,92 +102,49 @@ def make_calc_prob_fire(gamma):
     return prob_func
 
 
-def get_neighbors(landscape):
-    """
-    Figure out the integer indices of the von Neumann neighborhood of every cell in the 2d landscape.
-    Cells in corners only have 2 neighbors and cells on edges have on 3 neighbors. Construct a 2d array, where
-    each element is the integer indices of the neighboring cells of the element.
-
-    Usage:
-        neighbors = get_neighbors(landscape)
-        # each row contains the landscape values of a neighbor of the cell at (row, col).
-        nbs = landscape[neighbors[row, col]]
-
-    Parameters:
-        :param landscape: a 3d ndarray. The first two dims are row and column. The 3rd dim is cell data.
-        :return: a 2d ndarray containing integer indices tuples. Each tuple of indices is the indices of the
-         neighbors of that cell.
-    """
-
-    # get the integer index of every row and column
-    # shape: (2, nrows, ncols)
-    # e.g. for a 2x2 landscape: idx = array([[[0, 0], [1, 1]], [[0, 1], [0, 1]]])
-    # so element (0, 1, 1) contains the row index for the 2nd row and 2nd column: 1
-    idx = np.indices(landscape.shape[:2])
-    # the neighbor to the north for the top row is padded to -1 to indicate no neighbor
-    # otherwise the neighbor is the idx of the cell in the row above
-    # e.g. array([[[-1, -1], [ 0,  0]], [[-1, -1], [ 0,  1]]])
-    north = np.pad(idx[:, :-1, :], ((0, 0), (1, 0), (0, 0)), mode='constant', constant_values=-1)
-    south = np.pad(idx[:, 1:, :], ((0, 0), (0, 1), (0, 0)), mode='constant', constant_values=-1)
-    west = np.pad(idx[:, :, :-1], ((0, 0), (0, 0), (1, 0)), mode='constant', constant_values=-1)
-    east = np.pad(idx[:, :, 1:], ((0, 0), (0, 0), (0, 1)), mode='constant', constant_values=-1)
-    # smush the cell and all 4 neighbors together
-    stacked = np.stack([north, east, south, west], axis=3)
-    # convert the north, east, south, west neighbors into a tuple of row indices and column indices
-    # suitable for advanced integer indexing
-    neighbors = np.empty(landscape.shape[:2], dtype=object)
-    for i in range(neighbors.shape[0]):
-        for j in range(neighbors.shape[1]):
-            # filter out out-of-bounds neighbors
-            n_idx = (stacked[0, i, j][stacked[0, i, j] >= 0], stacked[1, i, j][stacked[1, i, j] >= 0])
-            neighbors[i, j] = n_idx
-
-    return neighbors
-
-
 def get_neighborhoods(landscape):
     """
-    Figure out the integer indices of the von Neumann neighborhood of every cell in the 2d landscape.
-    A neighborhood contains the cell and the adjacent cells.
-    Cells in corners only have 2 neighbors and cells on edges have on 3 neighbors. Construct a 2d array, where
-    each element is the integer indices of the cells in the neighborhood.
+    Figure out the integer indices of the von Neumann neighborhood of every cell in the landscape. The indices of
+    the neighborhood are computed naively, so cells on the edge of the landscape will have neighbors with indices that
+    are off the edge of the landscape. E.g. the indices of the cell to the north of cell (0, 0) is (-1, 0).
 
     Usage:
         neighborhoods = get_neighborhoods(landscape)
         # each row contains the landscape values of a cell in the neighborhood at (row, col).
-        nbs = landscape[neighborhoods[row, col]]
+        nbs = landscape[tuple(neighborhoods[row, col])]
 
     Parameters:
         :param landscape: a 3d ndarray. The first two dims are row and column. The 3rd dim is cell data.
 
     Returns:
-        :return: a 2d ndarray containing integer indices tuples. Each tuple of indices is the indices of the
-         cells in the neighborhood.
+       a 4d array of shape (n_row, n_col, 2, 5). The first 2 axes correspond to the rows and
+     columns of the landscape. The next 2 axis contain the row and column indices of the neighbors of the cell.
+     The neighbors are ordered along axis 3 as (center, north, east, south, west).
     """
-
     # get the integer index of every row and column
-    # shape: (2, nrows, ncols)
-    # e.g. for a 2x2 landscape: idx = array([[[0, 0], [1, 1]], [[0, 1], [0, 1]]])
+    # shape: (2, nrows, ncols), where the first element of axis 0 contains the row indices
+    # and the second element of axis 0 contains the column indices.
+    # e.g. for a 3x3 landscape: idx = array(
+    # [[[0, 0, 0],
+    #   [1, 1, 1],
+    #   [2, 2, 2]],
+    #  [[0, 1, 2],
+    #   [0, 1, 2],
+    #   [0, 1, 2]]])
     # so element (0, 1, 1) contains the row index for the 2nd row and 2nd column: 1
     idx = np.indices(landscape.shape[:2])
-    # the neighbor to the north for the top row is padded to -1 to indicate no neighbor
-    # otherwise the neighbor is the idx of the cell in the row above
-    # e.g. array([[[-1, -1], [ 0,  0]], [[-1, -1], [ 0,  1]]])
-    north = np.pad(idx[:, :-1, :], ((0, 0), (1, 0), (0, 0)), mode='constant', constant_values=-1)
-    south = np.pad(idx[:, 1:, :], ((0, 0), (0, 1), (0, 0)), mode='constant', constant_values=-1)
-    west = np.pad(idx[:, :, :-1], ((0, 0), (0, 0), (1, 0)), mode='constant', constant_values=-1)
-    east = np.pad(idx[:, :, 1:], ((0, 0), (0, 0), (0, 1)), mode='constant', constant_values=-1)
-    # smush the cell and all 4 neighbors together
-    stacked = np.stack([idx, north, east, south, west], axis=3)
-    # convert the north, east, south, west neighbors into a tuple of row indices and column indices
-    # suitable for advanced integer indexing
-    neighborhoods = np.empty(landscape.shape[:2], dtype=object)
-    for i in range(neighborhoods.shape[0]):
-        for j in range(neighborhoods.shape[1]):
-            # filter out out-of-bounds neighbors
-            n_idx = (stacked[0, i, j][stacked[0, i, j] >= 0], stacked[1, i, j][stacked[1, i, j] >= 0])
-            neighborhoods[i, j] = n_idx
 
+    north = idx.copy()
+    north[0] = idx[0] - 1  # north is cell in the row above
+    east = idx.copy()
+    east[1] = idx[1] + 1  # east is the cell in the column to the right
+    south = idx.copy()
+    south[0] = idx[0] + 1  # south is the cell in the row below
+    west = idx.copy()
+    west[1] = idx[1] - 1  # west is the cell in the column to the left
+    stacked = np.stack([idx, north, east, south, west], axis=3)  # axes: (row/col, n_row, n_col, n_neighborhood)
+
+    neighborhoods = np.transpose(stacked, (1, 2, 0, 3))  # axes (n_row, n_col, row/col, n_neighborhood)
     return neighborhoods
 
 
@@ -238,21 +163,22 @@ def simulate_fire(landscape, max_time, fire_func, with_state_maps=False):
     Returns:
         :return: the final landscape, or the final landscape and a list of state maps.
     """
+    # add padding so each cell in landscape has 4 neighbors, even cells on the edges of the landscape.
+    padded_landscape = np.pad(landscape, pad_width=((1, 1), (1, 1), (0, 0)), mode='constant', constant_values=np.nan)
 
-    # neighbors[i, j] contain the indices of the neighbors of cell i,j.
-    # neighbors = get_neighbors(landscape)
-    neighborhoods = get_neighborhoods(landscape)
+    # tuple(neighbors[i, j]) contains the indices of the neighborhood of cell (i, j).
+    neighborhoods = get_neighborhoods(padded_landscape)
 
     # Store the initial state of the landscape
     if with_state_maps:
-        state_maps = [get_state_layer(landscape)]
+        state_maps = [get_state_layer(padded_landscape[1:-1, 1:-1])]
 
     # BEGIN FIRE PROPOGATION
     for t in range(max_time):
 
         # what cells are trees that are not on fire but are bordering fire?
-        is_tree = landscape[:, :, L_TREE] == 1
-        is_fire = landscape[:, :, L_FIRE] == 1
+        is_tree = padded_landscape[:, :, L_TREE] == 1
+        is_fire = padded_landscape[:, :, L_FIRE] == 1
 
         is_fire_padded = np.pad(is_fire, 1, mode='constant', constant_values=False)
         is_fire_north = is_fire_padded[:-2, 1:-1]  # a fire is north of cell (i, j) if cell (i-1, j) is on fire
@@ -260,9 +186,6 @@ def simulate_fire(landscape, max_time, fire_func, with_state_maps=False):
         is_fire_east = is_fire_padded[1:-1, 2:]
         is_fire_west = is_fire_padded[1:-1, :-2]
         is_border = is_tree & np.logical_not(is_fire) & (is_fire_north | is_fire_south | is_fire_east | is_fire_west)
-
-        # indices as (row_idx, col_idx) tuple
-        # e.g. (array([0, 0, 1, 2, 2]), array([1, 2, 0, 1, 2]))
         border_idx = np.nonzero(is_border)
         border_size = len(border_idx[0])
 
@@ -271,22 +194,23 @@ def simulate_fire(landscape, max_time, fire_func, with_state_maps=False):
         for i in range(border_size):
             row = border_idx[0][i]
             col = border_idx[1][i]
-            # border_probs[i] = fire_func(landscape[row, col], landscape[neighbors[row, col]])
-            border_probs[i] = fire_func(landscape[neighborhoods[row, col]])
+            hood = padded_landscape[tuple(neighborhoods[row, col])]
+            # print(t, row, col, hood)  # confirm that neighborhoods of cells on landscape edges contain "nan" cells
+            border_probs[i] = fire_func(hood)
 
         # spread fire
         border_fire = border_probs > np.random.random(border_size)
-        landscape[border_idx[0][border_fire], border_idx[1][border_fire], L_FIRE] = 1
-        landscape[border_idx[0][border_fire], border_idx[1][border_fire], L_TREE] = 0
+        padded_landscape[border_idx[0][border_fire], border_idx[1][border_fire], L_FIRE] = 1
+        padded_landscape[border_idx[0][border_fire], border_idx[1][border_fire], L_TREE] = 0
 
         # record the current state of the landscape
         if with_state_maps:
-            state_maps.append(get_state_layer(landscape))
+            state_maps.append(get_state_layer(padded_landscape[1:-1, 1:-1]))
 
     if with_state_maps:
-        return landscape, state_maps
+        return padded_landscape[1:-1, 1:-1], state_maps
     else:
-        return landscape
+        return padded_landscape[1:-1, 1:-1]
 
 
 def iou_fitness(true_landscape, pred_landscape):
