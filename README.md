@@ -9,7 +9,7 @@ A sample call to generate 20 synthetic landscapes, including the layers and the
 initial and final burned landcapes:
 
 ```
-python mapsynth.py make_synthetic_dataset test_data 20 50 10.1 100 20 --seed 0
+python mapsynth.py make_synthetic_dataset --parent-dir=test_data -n20 -L50 -f10 --scale=100 --max-time=20 --seed=1
 ```
 
 
