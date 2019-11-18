@@ -17,6 +17,13 @@ from sklearn.metrics import jaccard_score
 S_FIRE = 1
 S_TREE = 2
 
+# Neighborhood Cell Indices
+N_CENTER = 0
+N_NORTH = 1
+N_EAST = 2
+N_SOUTH = 3
+N_WEST = 4
+
 # Landscape Layers, analogous to channels in deep neural network image models
 # CA state is one-hot encoded (one layer per state)
 L_FIRE = 0  # fire state
@@ -29,12 +36,26 @@ L_WD = 6  # wind direction
 
 
 def show_landscape(landscape):
-    z = landscape[:, :, L_Z]
+    fig, ax = plt.subplots(figsize=(12, 8))  # 20, 20))
+    # plot fire and trees
     state = get_state_layer(landscape)
-    fig, ax = plt.subplots(figsize=(15, 10))
     cmap = colors.ListedColormap(['red', 'green'])
     ax.matshow(state, cmap=cmap)
-    plt.contour(z, colors="b")
+    # plot topographic contours
+    z = landscape[:, :, L_Z]
+    contours = plt.contour(z)  # , colors="b")
+    plt.clabel(contours, inline=1, fontsize=10)
+    # plot wind arrows
+    radians = landscape[:, :, L_WD]
+    x = np.arange(0, landscape.shape[0], 1)[::10]
+    y = np.arange(0, landscape.shape[1], 1)[::10]
+    X, Y = np.meshgrid(x, y)
+    u = np.cos(radians)[::10, ::10]
+    v = np.sin(radians)[::10, ::10]
+    ax.quiver(X, Y, u, v)
+    # ax.xaxis.set_ticks([])
+    # ax.yaxis.set_ticks([])
+    # ax.set_aspect('equal')
     plt.show()
 
 
@@ -146,6 +167,25 @@ def get_neighborhoods(landscape):
 
     neighborhoods = np.transpose(stacked, (1, 2, 0, 3))  # axes (n_row, n_col, row/col, n_neighborhood)
     return neighborhoods
+
+
+def get_neighborhood_values(landscape, i, j):
+    '''
+    WARNING: Slow function. For debugging not production.
+
+    Create a padded landscape, compute the neighbors, and extract the neighborhood values of landscape[i, j]. Return
+    nan values for out-of-bounds neighbors of cells on an edge of the landscape.
+    :param landscape: Not a padded landscape
+    :param i:
+    :param j:
+    :return:
+    '''
+    # add padding so each cell in landscape has 4 neighbors, even cells on the edges of the landscape.
+    padded_landscape = np.pad(landscape, pad_width=((1, 1), (1, 1), (0, 0)), mode='constant', constant_values=np.nan)
+    # tuple(neighbors[i, j]) contains the indices of the neighborhood of cell (i, j).
+    neighborhoods = get_neighborhoods(padded_landscape)
+    hood = padded_landscape[tuple(neighborhoods[i + 1, j + 1])]
+    return hood
 
 
 def simulate_fire(landscape, max_time, fire_func, with_state_maps=False):
@@ -316,6 +356,7 @@ def main():
     show_landscape(pred_landscape)
     # convert the landscape state over time to images and save.
     output_state_maps(final_landscape[:, :, L_Z], state_maps)
+
 
 if __name__ == '__main__':
     main()

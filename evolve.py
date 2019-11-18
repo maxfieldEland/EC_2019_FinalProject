@@ -25,7 +25,7 @@ import numpy as np
 import operator
 import random
 
-from wildfire import L_Z, L_FIRE, L_TREE, L_HUM, L_TEMP, L_WE, L_WN
+from wildfire import L_Z, L_FIRE, L_TREE, L_HUM, L_TEMP, L_WS, L_WD
 from wildfire import simulate_fire, iou_fitness
 
 

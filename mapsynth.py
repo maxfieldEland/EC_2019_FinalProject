@@ -6,22 +6,38 @@ Then the layers are stitched into a landscape (3-d ndarray), an initial burn is 
 simulation is run, and then the initial burned landscape and final burned landscape are saved.
 
 Usage
+=====
 
-Test making a perlin noise layer:
+Make Landscapes
+---------------
 
-python mapsynth.py make_perlin_layer -L50 -f10 --scale=100 --display --norm
+Make n=2 landscapes, layers only:
 
-Make 10 synthetic landscapes with initial and final burns:
+python mapsynth.py make_landscapes --dataset-dir=foo -n2 -L100 --scale=400 --seed=1 --display
 
-python mapsynth.py make_synthetic_dataset --parent-dir=test_data -n10 -L50 -f10 --scale=100 --max-time=20 --seed=1
 
-Make 2 landscapes, layers only:
+Burn Landscapes
+---------------
 
-python mapsynth.py make_landscapes --dataset-dir=test_data/test_dataset -n2 -L100 -f10 --scale=100 --seed=1 --display
-
+Different burn functions are influenced by different factors in the landscape, like wind or difference in elevation (dz)
+or a balance of elevation change, temp, humidity, and wind. The original burn function is available too.
 Burn every landscape in a dataset for 4 * 20 timesteps, saving the landscape initially and after every 20 time step burn:
 
-python mapsynth.py burn_landscapes --dataset-dir=test_data/test_dataset --max-time=20 --num-periods=4 --seed=1 --display
+time python mapsynth.py burn_landscapes --dataset-dir=foo --max-time=20 --num-periods=4 --seed=1 --display --func-type balanced_logits
+
+time python mapsynth.py burn_landscapes --dataset-dir=foo --max-time=20 --num-periods=4 --seed=1 --display --func-type dz_logits
+
+time python mapsynth.py burn_landscapes --dataset-dir=foo --max-time=20 --num-periods=4 --seed=1 --display --func-type wind_logits
+
+time python mapsynth.py burn_landscapes --dataset-dir=foo --max-time=20 --num-periods=4 --seed=1 --display --func-type original
+
+Visualization
+-------------
+
+Display a burned landscape:
+
+python mapsynth.py display_landscape_file --path=foo/landscape_00/landscape_burn_1.npy
+
 
 """
 
@@ -32,6 +48,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 import wildfire as wf
+from wildfire import L_FIRE, L_TREE, L_Z, L_TEMP, L_HUM, L_WS, L_WD, N_CENTER
+import features
 
 
 def display_layer(layer):
@@ -51,6 +69,53 @@ def display_layers_from_dir(path):
         fn = Path(path) / (name + '.npy')
         layer = np.load(fn)
         display_layer(layer)
+
+
+def display_landscape_file(path):
+    landscape = np.load(path)
+    wf.show_landscape(landscape)
+
+
+def plot_landscape_histograms_from_file(path):
+    landscape = np.load(path)
+    plot_landscape_histograms(landscape)
+
+
+def plot_landscape_histograms(landscape):
+    n_hood = wf.get_neighborhood_values(landscape, 0, 0).shape[0]  # the number of cells in a neighborhood (== 5)
+    dzs = np.zeros((landscape.size, n_hood))  # shape: n_landscape, n_hood
+    k = 0
+    for i in range(landscape.shape[0]):
+        for j in range(landscape.shape[1]):
+            k += 1
+            hood = wf.get_neighborhood_values(landscape, i, j)
+            delta_z = hood[:, L_Z] - hood[N_CENTER, L_Z]
+            dzs[k, :] = delta_z
+
+    dzs_mean = np.nanmean(dzs)
+    dzs_std = np.nanstd(dzs)
+    print('dzs_mean:', dzs_mean)
+    print('dzs_std:', dzs_std)
+    print('thresh, mean, std')
+    for thresh in [0.0, 0.0001, 0.001, 0.01, 0.1]:
+        m = np.nanmean(dzs.ravel()[np.abs(dzs.ravel()) >= thresh])
+        s = np.nanstd(dzs.ravel()[np.abs(dzs.ravel()) >= thresh])
+        print(f'{thresh}, {m}, {s}')
+
+    fig, ax = plt.subplots(5, 1, figsize=(12, 9), sharex=True)
+    bins = 100
+    ax[0].hist(dzs[:, 1:].ravel(), bins=bins)
+    ax[0].set_title('all')
+    ax[1].hist(dzs[:, 1], bins=bins)
+    ax[1].set_title('north')
+    ax[2].hist(dzs[:, 2], bins=bins)
+    ax[2].set_title('east')
+    ax[3].hist(dzs[:, 3], bins=bins)
+    ax[3].set_title('south')
+    ax[4].hist(dzs[:, 4], bins=bins)
+    ax[4].set_title('west')
+    plt.suptitle('Delta Z Histogram Segmented by Neighborhood Location')
+    plt.show()
 
 
 def fade(t):
@@ -129,27 +194,39 @@ def get_neighbors_idx(layer):
     return stacked
 
 
-def make_layer(path, name, L=50, f=10, scale=100, mean_lim=(0, 10), noise_range=1, center_noise=False, display=False):
-    # ranges from 0 to noise_range
-    noise_layer = make_perlin_layer(L, f, scale, norm=True) * noise_range
-    if center_noise:
-        # ranges from -noise_range/2 to noise_range/2
-        noise_layer = noise_layer - (noise_range / 2)
+def make_layer(path, name, L=50, scale=100, signal_range=(0., 10.), noise_range=(0., 1.), display=False):
+    '''
+    A layer is a matrix of values composed of a signal value + scaled, shifted perlin noise.
 
-    mean_min, mean_max = mean_lim
-    mean = np.random.random() * (mean_max - mean_min) + mean_min
-    layer = noise_layer + mean
+    :param path:
+    :param name:
+    :param L:
+    :param scale: the smoothness of the perlin noise. L and scale interact to determine smoothness.
+    As L increases, scale has to increase to maintain similarly
+    smooth contours at the larger landscape size.
+    :param signal_range:
+    :param noise_range:
+    :param display:
+    :return:
+    '''
+    # noise
+    noise_min, noise_max = noise_range
+    noise = make_perlin_layer(L, f=10, scale=scale, norm=True) * (noise_max - noise_min) + noise_min
+
+    signal_min, signal_max = signal_range
+    signal = np.random.random() * (signal_max - signal_min) + signal_min
+    layer = signal + noise
     filename = Path(path) / f'{name}.npy'
     np.save(filename, layer)
     if display:
         display_layer(layer)
 
 
-def make_landscape_layers(path, L, f, scale, display=False):
+def make_landscape_layers(path, L, scale, signal_range=(0, 10), noise_range=(0, 1), display=False):
     '''
     :param path: The directory in which to save the layer ndarrays.
     :param L: the size of the layer
-    :param f: most layers (excepting wind_direction) have a minimum value ranging from 0 to f.
+    :param signal: all layers except wind direction have a signal value in the range [0, signal).
     :param scale: the smoothness of the perlin noise. higher is smoother.
     :param display: show each layer
     :return:
@@ -157,16 +234,12 @@ def make_landscape_layers(path, L, f, scale, display=False):
     '''
     :return:
     '''
-    make_layer(path, 'topography', L=L, f=f, scale=scale, mean_lim=(0, f), noise_range=1, center_noise=False,
-               display=display)
-    make_layer(path, 'temperature', L=L, f=f, scale=scale, mean_lim=(0, f), noise_range=1, center_noise=False,
-               display=display)
-    make_layer(path, 'humidity', L=L, f=f, scale=scale, mean_lim=(0, f), noise_range=1, center_noise=False,
-               display=display)
-    make_layer(path, 'wind_speed', L=L, f=f, scale=scale, mean_lim=(0, f), noise_range=1, center_noise=False,
-               display=display)
-    make_layer(path, 'wind_direction', L=L, f=f, scale=scale, mean_lim=(0, 2 * np.pi), noise_range=np.pi / 4, center_noise=True,
-               display=display)
+    make_layer(path, 'topography', L=L, scale=scale, signal_range=signal_range, noise_range=noise_range, display=display)
+    make_layer(path, 'temperature', L=L, scale=scale, signal_range=signal_range, noise_range=noise_range, display=display)
+    make_layer(path, 'humidity', L=L, scale=scale, signal_range=signal_range, noise_range=noise_range, display=display)
+    make_layer(path, 'wind_speed', L=L, scale=scale, signal_range=signal_range, noise_range=noise_range, display=display)
+    make_layer(path, 'wind_direction', L=L, scale=scale, signal_range=(0, 2 * np.pi),
+               noise_range=(-np.pi / 2, np.pi / 2), display=display)
 
 
 def start_fire(landscape):
@@ -233,11 +306,11 @@ def make_synthetic_dataset(parent_dir, n, L, f, scale, max_time, seed=None):
         padded_i = str(i).zfill(len(str(n)))  # e.g. n=100, i=11, padded_i='011'
         landscape_dir = dn / f'landscape_{padded_i}'
         landscape_dir.mkdir(parents=True, exist_ok=True)
-        make_landscape_layers(landscape_dir, L, f, scale)
+        make_landscape_layers(landscape_dir, L=L, scale=scale, signal_range=(0, 10), noise_range=(0, 1))
         make_initial_and_final_state(landscape_dir, max_time, display=False)
 
 
-def make_landscapes(dataset_dir, n, L, f, scale, seed=None, display=False):
+def make_landscapes(dataset_dir, n, L, scale, seed=None, display=False):
     '''
     Make the layers of n landscapes, with each landscape in its own directory underneath dataset_dir.
 
@@ -260,10 +333,12 @@ def make_landscapes(dataset_dir, n, L, f, scale, seed=None, display=False):
         padded_i = str(i).zfill(len(str(n)))  # e.g. n=100, i=11, padded_i='011'
         landscape_dir = dn / f'landscape_{padded_i}'
         landscape_dir.mkdir(parents=True, exist_ok=True)
-        make_landscape_layers(landscape_dir, L, f, scale, display=display)
+        make_landscape_layers(landscape_dir, L=L, scale=scale,
+                              signal_range=(0, 10), noise_range=(0, 1), display=display)
 
 
-def burn_landscapes(dataset_dir=None, landscape_dir=None, max_time=20, num_periods=1, seed=None, display=False):
+def burn_landscapes(dataset_dir=None, landscape_dir=None, max_time=20, num_periods=1, seed=None, display=False,
+                    func_type='original'):
     # reproducibility
     if seed is not None:
         np.random.seed(seed)
@@ -289,9 +364,36 @@ def burn_landscapes(dataset_dir=None, landscape_dir=None, max_time=20, num_perio
         if display:
             wf.show_landscape(landscape)
 
+        if func_type == 'dz_logits':
+            # spread driven by dz. biased against spreading downhill
+            prob_func = features.make_logits_fire_func(features.make_scaled_logits_func(
+                bias=-6, feature_scale=np.array([10.0, 0.0, 0.0, 0.0])
+            ))
+        elif func_type == 'wind_logits':
+            # spread driven by wind speed and direction
+            prob_func = features.make_logits_fire_func(features.make_scaled_logits_func(
+                bias=-6, feature_scale=np.array([0.0, 0.0, 0.0, 3.0])
+            ))
+        elif func_type == 'balanced_logits':
+            # NOTE, these weights are tuned to f=10, L=100, scale=400.
+            # feature scale: dz_scale, temperature_scale, humidity_scale, wind_scale
+            # spread driven by a balance of dz and wind
+            # dz is scaled to show moderate influence from topographical gradients in the standard landscape
+            # dz is scaled to have between ~1/8 and 8
+            # temperature is scaled to have between 0 and ~2.2 logits
+            # humidity is scaled to have between 0 and -2.2 logits
+            # wind is scaled to have between 1/8 and 7-10 logits
+            prob_func = features.make_logits_fire_func(features.make_scaled_logits_func(
+                bias=-7, feature_scale=np.array([6.0, 0.2, 0.2, 0.8])
+            ))
+        elif func_type == 'original':
+            # the original probability func
+            prob_func = wf.make_calc_prob_fire(gamma=0.7)
+        else:
+            raise Exception('Unrecognized func_type', func_type)
+
         # burn the landscape sequentially num_periods times for max_time steps each burn.
         for i in range(1, num_periods+1):
-            prob_func = wf.make_calc_prob_fire(gamma=0.7)
             landscape = wf.simulate_fire(landscape, max_time, prob_func, with_state_maps=False)
             save_landscape(path, landscape, i)
             if display:
@@ -340,7 +442,6 @@ if __name__ == '__main__':
     parser.add_argument('--dataset-dir', help='The directory in which to create the landscape directories')
     parser.add_argument('-n', type=int, help='The number of landscapes to create')
     parser.add_argument('-L', type=int, help='The length of the sides of the landscape grid')
-    parser.add_argument('-f', type=float, help='The average value of the Perlin noise')
     parser.add_argument('--scale', type=int, help='The smoothness of the Perlin noise')
     parser.add_argument('--seed', type=int, default=0,
                         help='Used to seed the random number generator for reproducibility')
@@ -355,11 +456,23 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=0,
                         help='Used to seed the random number generator for reproducibility')
     parser.add_argument('--display', default=False, action='store_true', help='Display each burned landscape')
+    parser.add_argument('--func-type', default='original', choices=['original', 'balanced_logits', 'dz_logits',
+                                                                    'wind_logits'])
     parser.set_defaults(func=burn_landscapes)
 
     parser = subparsers.add_parser('display_layers_from_dir', help='Display the layers in a landscape dir')
-    parser.add_argument('path', help='directory containing landscape layers')
+    parser.add_argument('--path', help='directory containing landscape layers')
     parser.set_defaults(func=display_layers_from_dir)
+
+    parser = subparsers.add_parser('display_landscape_file', help='Display a landscape burn file')
+    parser.add_argument('--path', help='npy file containing landscape')
+    parser.set_defaults(func=display_landscape_file)
+
+    parser = subparsers.add_parser('plot_landscape_histograms_from_file', help='Display a landscape burn file')
+    parser.add_argument('--path', help='npy file containing landscape')
+    parser.set_defaults(func=plot_landscape_histograms_from_file)
+
+
 
     args = main_parser.parse_args()
     # print(args)
