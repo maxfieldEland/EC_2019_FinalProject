@@ -53,6 +53,10 @@ import features
 
 func_types = ['dz_logits','wind_logits','balanced_logits','original']
 
+#
+# VISUALIZATION FUNCTIONS
+#
+
 def display_layer(layer):
     x, y = np.mgrid[:layer.shape[0], :layer.shape[1]]
     fig = plt.figure(figsize=(8, 6))
@@ -118,6 +122,101 @@ def plot_landscape_histograms(landscape):
     plt.suptitle('Delta Z Histogram Segmented by Neighborhood Location')
     plt.show()
 
+#
+# LANDSCAPE and DATASET FILE I/O
+#
+
+
+def load_init_and_final_landscapes(dataset_dir=None, landscape_dir=None):
+    lds = get_landscape_dirs(dataset_dir=dataset_dir, landscape_dir=landscape_dir)
+    landscapes = np.array([get_init_and_final_landscape(ld) for ld in lds])
+    return landscapes  # shape: n_land, n_burn, n_row, n_col, n_feat
+
+
+def get_init_and_final_landscape(landscape_dir):
+    init_landscape = np.load(Path(landscape_dir) / 'init_landscape.npy')
+    final_landscape = np.load(Path(landscape_dir) / 'final_landscape.npy')
+    return np.stack([init_landscape, final_landscape])  # shape: n_burn, n_row, n_col, n_feat
+
+
+def load_dataset_burns(dataset_dir=None, landscape_dir=None, func_type=None):
+    lds = get_landscape_dirs(dataset_dir=dataset_dir, landscape_dir=landscape_dir)
+    landscapes = np.array([get_landscape_burns(ld, func_type=func_type) for ld in lds])
+    return landscapes  # shape: n_land, n_row, n_col, n_feat
+
+
+def get_landscape_burns(landscape_dir, func_type=None):
+    '''
+    Return all the burns in a landscape dir as a shape (n_burn, n_row, n_col, n_feat) ndarray.
+
+    :param landscape_dir:
+    :param func_type:
+    :return: ndarray, shape == (n_land, n_burn, n_row, n_col, n_feat)
+    '''
+    lbfs = get_landscape_burn_files(landscape_dir, func_type=func_type)
+    return np.stack([np.load(lbf) for lbf in lbfs])  # shape n_burn, n_row, n_col, n_feat
+
+
+def load_dataset_burn_i(burn_i, dataset_dir=None, landscape_dir=None, func_type=None):
+    '''
+    Load every landscape_*/landscape_burn_[0]i.npy in a dataset into a ndarray whose
+    axis 0 is the size n_land landscape axis.
+    :param burn_i: E.g. 0 for "initial_landscape" or 1 for "final_landscape"
+    :param dataset_dir: contains multiple landscape directories. Exclusive of landscape_dir.
+    :param landscape_dir: if True, only load a single landscape dir. n_land == 1.
+    :param func_type: if None, match paths like 'landscape_burn_{burn_i}.npy'. Otherwise match
+    paths like 'landscape_burn_{func_type}_{burn_i}.npy'.
+    :return: ndarray, shape == (n_land, n_row, n_col, n_feat)
+    '''
+    lds = get_landscape_dirs(dataset_dir=dataset_dir, landscape_dir=landscape_dir)
+    landscapes = np.array([get_landscape_burn_i(burn_i, ld, func_type=func_type) for ld in lds])
+    return landscapes  # shape: n_land, n_row, n_col, n_feat
+
+
+def get_landscape_burn_i(burn_i, landscape_dir, func_type=None):
+    '''
+    Load the landscape_burn_{burn_i}.npy file or landscape_burn_{func_type}_{burn_i}.npy
+    :return: shape (n_row, n_col, n_feat)
+    '''
+    lfs = get_landscape_burn_files(landscape_dir, func_type=func_type)
+    return np.load(lfs[burn_i]) # load the ith landscape
+
+
+def get_landscape_burn_files(landscape_dir, func_type=None):
+    '''
+    Return a list of every landscape_burn_*.npy file path or every landscape_burn_{func_type}_*.npy
+    :param landscape_dir:
+    :param func_type: if not none, return landscape burns paths of that type
+    :return: A list of landscape burn paths, sorted numerically according to the index in the file name.
+    '''
+    globex = f'landscape_burn_{func_type}_*.npy' if func_type else 'landscape_burn_*.npy'
+    return list(sorted([path for path in Path(landscape_dir).glob(globex)]))
+
+
+def get_landscape_dirs(dataset_dir=None, landscape_dir=None):
+    '''
+    Treats a landscape_dir as a dataset of size 1. Every landscape dir in dataset_dir is
+    returned as a list. Exactly one of dataset_dir and landscape_dir must be chosen.
+
+    :param dataset_dir:
+    :param landscape_dir:
+    :return:
+    '''
+    # burn either a single landscape or all the landscapes in a directory
+    if (dataset_dir and landscape_dir) or (not dataset_dir and not landscape_dir):
+        raise Exception('Please specify exactly one of dataset_dir or landscape_dir')
+    elif landscape_dir:
+        dirs = [Path(landscape_dir)]
+    else:
+        dirs = [d for d in Path(dataset_dir).glob('landscape_*')]
+
+    return list(sorted(dirs))
+
+
+
+#
+# LANDSCAPE GENERATION FUNCTIONS
+#
 
 def fade(t):
     """
@@ -369,6 +468,7 @@ def make_landscapes(dataset_dir, n, L, scale, seed=None, display=False):
 
     dn = Path(dataset_dir)
     for i in range(n):
+        print(f'Making landscape {i}.')
         # each landscape has its own directory
         padded_i = str(i).zfill(len(str(n)))  # e.g. n=100, i=11, padded_i='011'
         landscape_dir = dn / f'landscape_{padded_i}'
@@ -377,30 +477,26 @@ def make_landscapes(dataset_dir, n, L, scale, seed=None, display=False):
                               signal_range=(0, 10), noise_range=(0, 1), display=display)
 
 
-def burn_landscapes(spread_prob_func,dataset_dir=None, landscape_dir=None, max_time=20, num_periods=1, seed=None, display=False,
+def save_landscape(path, landscape, i, num_periods, func_type=None):
+        padded_i = str(i).zfill(len(str(num_periods)))  # e.g. num_periods=10, i=2, padded_i='02'
+        np.save(path / f'landscape_burn_{func_type}_{padded_i}.npy', landscape)
+
+
+def burn_landscapes(spread_prob_func=None, dataset_dir=None, landscape_dir=None, max_time=20, num_periods=1, seed=None, display=False,
                     func_type='original'):
     # reproducibility
     if seed is not None:
         np.random.seed(seed)
 
     # burn either a single landscape or all the landscapes in a directory
-    if (dataset_dir and landscape_dir) or (not dataset_dir and not landscape_dir):
-        raise Exception('Please specify exactly one of dataset_dir or landscape_dir')
-    elif landscape_dir:
-        dirs = [Path(landscape_dir)]
-    else:
-        dirs = [d for d in Path(dataset_dir).iterdir() if d.is_dir()]
-
-    def save_landscape(path, landscape, i,func_type):
-        padded_i = str(i).zfill(len(str(num_periods)))  # e.g. num_periods=10, i=2, padded_i='02'
-        np.save(path / f'landscape_burn_{func_type}_{padded_i}.npy', landscape)
+    dirs = get_landscape_dirs(dataset_dir, landscape_dir)
 
     for path in dirs:
         landscape = wf.make_landscape_from_dir(path)
 
         # the initial burn
         landscape = start_fire(landscape)
-        save_landscape(path, landscape, 0,func_type)
+        save_landscape(path, landscape, 0, num_periods, func_type=func_type)
         if display:
             wf.show_landscape(landscape)
 
@@ -429,13 +525,12 @@ def burn_landscapes(spread_prob_func,dataset_dir=None, landscape_dir=None, max_t
         elif func_type == 'original':
             # the original probability func
             prob_func = wf.make_calc_prob_fire(gamma=0.7)
-        
- 
         else:
             #raise Exception('Unrecognized func_type', func_type)
             # allow the actual function to be passed in as a param so we can use the GP function
             prob_func = spread_prob_func
             print(max_time)
+
         # burn the landscape sequentially num_periods times for max_time steps each burn.
         for i in range(1, num_periods+1):
             # burn landscape based on todds or max's implementation
@@ -447,34 +542,28 @@ def burn_landscapes(spread_prob_func,dataset_dir=None, landscape_dir=None, max_t
                 landscape = wf.simulate_fire(landscape, max_time, prob_func, with_state_maps=False)
             # for max's simulation functions
 
-            save_landscape(path, landscape,i,func_type)
+            save_landscape(path, landscape, i, num_periods, func_type=func_type)
             if display:
                 wf.show_landscape(landscape)
-                
-def burn_landscape_n_times(spread_prob_func,dataset_dir=None, landscape_dir=None, max_time=20, num_periods=1, seed=None, display=False,
-                    func_type='original'):
+
+
+def burn_landscape_n_times(spread_prob_func, dataset_dir=None, landscape_dir=None, max_time=20, num_periods=1,
+                           seed=None, display=False, func_type='original'):
     # reproducibility
     if seed is not None:
         np.random.seed(seed)
 
     # burn either a single landscape or all the landscapes in a directory
-    if (dataset_dir and landscape_dir) or (not dataset_dir and not landscape_dir):
-        raise Exception('Please specify exactly one of dataset_dir or landscape_dir')
-    elif landscape_dir:
-        dirs = [Path(landscape_dir)]
-    else:
-        dirs = [d for d in Path(dataset_dir).iterdir() if d.is_dir()]
 
-    def save_landscape(path, landscape, i,func_type):
-        padded_i = str(i).zfill(len(str(num_periods)))  # e.g. num_periods=10, i=2, padded_i='02'
-        np.save(path / f'landscape_burn_{func_type}_{padded_i}.npy', landscape)
+    # burn either a single landscape or all the landscapes in a directory
+    dirs = get_landscape_dirs(dataset_dir, landscape_dir)
 
     for path in dirs:
         landscape = wf.make_landscape_from_dir(path)
 
         # the initial burn
         landscape = start_fire(landscape)
-        save_landscape(path, landscape, 0,func_type)
+        save_landscape(path, landscape, 0, num_periods, func_type=func_type)
         if display:
             wf.show_landscape(landscape)
 
@@ -503,13 +592,12 @@ def burn_landscape_n_times(spread_prob_func,dataset_dir=None, landscape_dir=None
         elif func_type == 'original':
             # the original probability func
             prob_func = wf.make_calc_prob_fire(gamma=0.7)
-        
- 
         else:
             #raise Exception('Unrecognized func_type', func_type)
             # allow the actual function to be passed in as a param so we can use the GP function
             prob_func = spread_prob_func
             print(max_time)
+
         # burn the landscape sequentially num_periods times for max_time steps each burn.
         for i in range(1, num_periods+1):
             # burn landscape based on todds or max's implementation
@@ -521,12 +609,10 @@ def burn_landscape_n_times(spread_prob_func,dataset_dir=None, landscape_dir=None
                 final_landscape = wf.simulate_fire(landscape, max_time, prob_func, with_state_maps=False)
             # for max's simulation functions
 
-            save_landscape(path, final_landscape,i,func_type)
+            save_landscape(path, final_landscape, i, num_periods, func_type=func_type)
             if display:
                 wf.show_landscape(final_landscape)
 
-                
-    
                 
 def main(*args):
     for fn in ('topography.npy', 'wind_speed.npy', 'temperature.npy', 'humidity.npy'):
@@ -599,7 +685,6 @@ if __name__ == '__main__':
     parser = subparsers.add_parser('plot_landscape_histograms_from_file', help='Display a landscape burn file')
     parser.add_argument('--path', help='npy file containing landscape')
     parser.set_defaults(func=plot_landscape_histograms_from_file)
-
 
 
     args = main_parser.parse_args()

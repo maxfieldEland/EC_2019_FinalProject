@@ -39,7 +39,7 @@ def make_scaled_logits_func(bias, feature_scale):
 def make_logits_fire_func(func):
     '''
     Return a function that takes a neighborhood, transforms it into our hand-engineered
-    features, passes those features to func and returns what func returns.
+    features, passes those features (as an ndarray) to func and returns what func returns.
 
     :param func: A function that takes the engineered features and returns the probability of fire spreading.
     '''

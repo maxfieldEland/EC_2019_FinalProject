@@ -256,30 +256,6 @@ def simulate_fire(landscape, max_time, fire_func, with_state_maps=False):
         return padded_landscape[1:-1, 1:-1]
 
 
-def iou_fitness(true_landscape, pred_landscape):
-    """
-    Note: This function returns the same results as `loss_function`, taking landscapes instead of
-    state maps to avoid the overhead of creating state maps from landscapes.
-
-    Compute the intersection over union of the true landscape and predicted landscape.
-    Perfect agreement is 1. Complete disagreement is 0.
-
-    Parameters:
-        :param true_landscape:
-        :param pred_landscape:
-
-    Returns:
-        :return: the IoU, a float between 0 and 1.
-    """
-
-    # only consider sites that can burn (ignore rock, water)
-    trees_or_fire_idx = np.nonzero((true_landscape[:, :, L_FIRE] == 1) | (true_landscape[:, :, L_TREE] == 1))
-    y_true = true_landscape[:, :, L_FIRE][trees_or_fire_idx]
-    y_pred = pred_landscape[:, :, L_FIRE][trees_or_fire_idx]
-    iou = jaccard_score(y_true, y_pred)
-    return iou
-
-
 def loss_function(predicted, truth):
     """
     Calculate loss of the full simulation based on the Jaccard Index
@@ -441,6 +417,30 @@ def simulate_test_fire(landscape, max_time, fire_func, with_state_maps=False):
         return padded_landscape[1:-1, 1:-1]
 
 
+def iou_fitness(true_landscape, pred_landscape):
+    """
+    Note: This function returns the same results as `loss_function`, taking landscapes instead of
+    state maps to avoid the overhead of creating state maps from landscapes.
+
+    Compute the intersection over union of the true landscape and predicted landscape.
+    Perfect agreement is 1. Complete disagreement is 0.
+
+    Parameters:
+        :param true_landscape:
+        :param pred_landscape:
+
+    Returns:
+        :return: the IoU, a float between 0 and 1.
+    """
+
+    # only consider sites that can burn (ignore rock, water)
+    trees_or_fire_idx = np.nonzero((true_landscape[:, :, L_FIRE] == 1) | (true_landscape[:, :, L_TREE] == 1))
+    y_true = true_landscape[:, :, L_FIRE][trees_or_fire_idx]
+    y_pred = pred_landscape[:, :, L_FIRE][trees_or_fire_idx]
+    iou = jaccard_score(y_true, y_pred)
+    return iou
+
+
 def multi_sim_iou_fitness(true_landscapes, pred_landscapes):
     """
     Note: This function returns the same results as `loss_function`, taking landscapes instead of
@@ -455,18 +455,45 @@ def multi_sim_iou_fitness(true_landscapes, pred_landscapes):
     """
     ious = []
     for simulation_idx in range(len(pred_landscapes)):
-        
         pred_landscape = pred_landscapes[simulation_idx]
         true_landscape = true_landscapes[simulation_idx]
-    
-        trees_or_fire_idx = np.nonzero((true_landscape[:, :, L_FIRE] == 1) | (true_landscape[:, :, L_TREE] == 1))
-        y_true = true_landscape[:, :, L_FIRE][trees_or_fire_idx]
-        y_pred = pred_landscape[:, :, L_FIRE][trees_or_fire_idx]
-        iou = jaccard_score(y_true, y_pred)
+        iou = iou_fitness(true_landscape, pred_landscape)
         ious.append(iou)
+
     mean_iou = np.average(ious)
     return mean_iou
 
+
+def evaluate(x, y, fire_func, n_sim=1, max_time=20):
+    '''
+    Evaluate the fitness of fire_func at simulating spreading a fire on landscapes in x for max_time steps.
+
+    :param x: init_landscapes
+    :param y: final_landscapes
+    :param fire_func: a fire spreading function for wildfire.simulate_fire.
+    :param int n_sim: The number of time to simulate each landscape. Multiple simulations reduce the variance in the
+    fitness evaluation.
+    :param max_time: The number of time steps for which to run each simulation.
+    :return: The mean fitness across all simulations and landscapes.
+    '''
+    fits = np.zeros(n_sim)
+    for i in range(n_sim):
+        pred = predict(x, fire_func, max_time)
+        fits[i] = multi_sim_iou_fitness(y, pred)
+
+    return fits.mean()
+
+
+def predict(x, fire_func, max_time):
+    """
+    Simulate a burn with fire_func for max_time time steps on each landscape in x.
+    Return the burns.
+    :param x:
+    :param fire_func:
+    :param max_time:
+    :return: an ndarray of burned landscapes. shape: (n_land, n_row, n_col, n_feat)
+    """
+    return np.array([simulate_fire(x[i], max_time, fire_func) for i in range(len(x))])
 
 
 def main():
