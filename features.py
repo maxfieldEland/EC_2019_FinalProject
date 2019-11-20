@@ -2,7 +2,7 @@
 import numpy as np
 from scipy.special import expit
 from wildfire import L_FIRE, L_TREE, L_Z, L_TEMP, L_HUM, L_WS, L_WD, N_CENTER
-
+import math
 
 def make_scaled_logits_func(bias, feature_scale):
     '''
@@ -122,3 +122,33 @@ def make_logits_fire_func(func):
 
     return prob_func
 
+def spread_uphill_only(fire, tree, z, temp, hum, mean_temp, mean_hum, mean_weighted_fire, wind_term):
+    if mean_weighted_fire > 0:
+        prob = 1
+    else:
+        prob = 0.2
+    return(prob)
+    
+    
+def generic_spreading(fire, tree, z, temp, hum, mean_temp, mean_hum, mean_weighted_fire, wind_term):
+    prod = (wind_term**2+mean_weighted_fire*mean_temp-mean_hum)/(mean_hum**4*(1/wind_term))
+ 
+    return(prod)
+    
+    
+def spread_with_wind(fire, tree, z, temp, hum, mean_temp, mean_hum, mean_weighted_fire, wind_term):
+    
+    if wind_term > 100:
+        wind_prob = .8
+    else:
+        wind_prob = .2
+        
+    if mean_weighted_fire > 0:
+        z_prob = 0.8
+    else:
+        z_prob = 0.2
+    
+    beta = 5
+    prob = np.average([beta*wind_prob, z_prob/beta])
+    #print(prob)
+    return(prob)

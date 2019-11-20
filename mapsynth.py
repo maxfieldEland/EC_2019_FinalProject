@@ -51,6 +51,7 @@ import wildfire as wf
 from wildfire import L_FIRE, L_TREE, L_Z, L_TEMP, L_HUM, L_WS, L_WD, N_CENTER
 import features
 
+func_types = ['dz_logits','wind_logits','balanced_logits','original']
 
 def display_layer(layer):
     x, y = np.mgrid[:layer.shape[0], :layer.shape[1]]
@@ -253,7 +254,7 @@ def start_fire(landscape):
     return landscape
 
 
-def make_initial_and_final_state(landscape_dir='data/synth_data/', max_time=20, seed=None, display=True):
+def make_initial_and_final_state(spreading_func,func_type,landscape_dir='data/synth_data/', max_time=20, seed=None, display=True):
     """
     Create a landscape, start an initial fire, simulate a burn for max_time time steps,
     and then save the initial fire and final fire landscapes.
@@ -276,9 +277,14 @@ def make_initial_and_final_state(landscape_dir='data/synth_data/', max_time=20, 
 
     # Simulate burn
     gamma = 0.7
-    final_landscape, state_maps = wf.simulate_fire(landscape, max_time, wf.make_calc_prob_fire(gamma),
+    # determine which burn simulator to use
+    if func_type not in func_types:
+        final_landscape, state_maps = wf.simulate_test_fire(landscape, max_time, spreading_func,
                                                    with_state_maps=True)
-
+    else:
+        final_landscape, state_maps = wf.simulate_fire(landscape, max_time, spreading_func,
+                                                   with_state_maps=True)
+    #print(final_landscape)
     # save initial and final landscapes
     np.save(landscape_path / 'init_landscape.npy', init_landscape)
     np.save(landscape_path / 'final_landscape.npy', final_landscape)
@@ -287,11 +293,45 @@ def make_initial_and_final_state(landscape_dir='data/synth_data/', max_time=20, 
         wf.show_landscape(final_landscape)
 
 
-def make_synthetic_dataset(parent_dir, n, L, f, scale, max_time, seed=None):
+def make_synthetic_dataset(spreading_func,parent_dir, n, L, f, scale, max_time,func_type=None, seed=None):
     try:
         f = int(f)
     except ValueError:
         pass
+    
+    # determine spreading function for simulation
+    
+    if func_type == 'dz_logits':
+            # spread driven by dz. biased against spreading downhill
+            prob_func = features.make_logits_fire_func(features.make_scaled_logits_func(
+                bias=-6, feature_scale=np.array([10.0, 0.0, 0.0, 0.0])
+            ))
+    elif func_type == 'wind_logits':
+        # spread driven by wind speed and direction
+        prob_func = features.make_logits_fire_func(features.make_scaled_logits_func(
+            bias=-6, feature_scale=np.array([0.0, 0.0, 0.0, 3.0])
+        ))
+    elif func_type == 'balanced_logits':
+        # NOTE, these weights are tuned to f=10, L=100, scale=400.
+        # feature scale: dz_scale, temperature_scale, humidity_scale, wind_scale
+        # spread driven by a balance of dz and wind
+        # dz is scaled to show moderate influence from topographical gradients in the standard landscape
+        # dz is scaled to have between ~1/8 and 8
+        # temperature is scaled to have between 0 and ~2.2 logits
+        # humidity is scaled to have between 0 and -2.2 logits
+        # wind is scaled to have between 1/8 and 7-10 logits
+        prob_func = features.make_logits_fire_func(features.make_scaled_logits_func(
+            bias=-7, feature_scale=np.array([6.0, 0.2, 0.2, 0.8])
+        ))
+    elif func_type == 'original':
+        # the original probability func
+        prob_func = wf.make_calc_prob_fire(gamma=0.7)
+    
+ 
+    else:
+        #raise Exception('Unrecognized func_type', func_type)
+        # allow the actual function to be passed in as a param so we can use the GP function
+        prob_func = spreading_func
 
     # create a directory for this dataset based on the parameters
     dn = Path(parent_dir) / f'plain_n_{n}_L_{L}_f_{f}_scale_{scale}_max_time_{max_time}_seed_{seed}'
@@ -307,7 +347,7 @@ def make_synthetic_dataset(parent_dir, n, L, f, scale, max_time, seed=None):
         landscape_dir = dn / f'landscape_{padded_i}'
         landscape_dir.mkdir(parents=True, exist_ok=True)
         make_landscape_layers(landscape_dir, L=L, scale=scale, signal_range=(0, 10), noise_range=(0, 1))
-        make_initial_and_final_state(landscape_dir, max_time, display=False)
+        make_initial_and_final_state(prob_func,func_type,landscape_dir, max_time, display=False)
 
 
 def make_landscapes(dataset_dir, n, L, scale, seed=None, display=False):
@@ -337,7 +377,7 @@ def make_landscapes(dataset_dir, n, L, scale, seed=None, display=False):
                               signal_range=(0, 10), noise_range=(0, 1), display=display)
 
 
-def burn_landscapes(dataset_dir=None, landscape_dir=None, max_time=20, num_periods=1, seed=None, display=False,
+def burn_landscapes(spread_prob_func,dataset_dir=None, landscape_dir=None, max_time=20, num_periods=1, seed=None, display=False,
                     func_type='original'):
     # reproducibility
     if seed is not None:
@@ -351,16 +391,16 @@ def burn_landscapes(dataset_dir=None, landscape_dir=None, max_time=20, num_perio
     else:
         dirs = [d for d in Path(dataset_dir).iterdir() if d.is_dir()]
 
-    def save_landscape(path, landscape, i):
+    def save_landscape(path, landscape, i,func_type):
         padded_i = str(i).zfill(len(str(num_periods)))  # e.g. num_periods=10, i=2, padded_i='02'
-        np.save(path / f'landscape_burn_{padded_i}.npy', landscape)
+        np.save(path / f'landscape_burn_{func_type}_{padded_i}.npy', landscape)
 
     for path in dirs:
         landscape = wf.make_landscape_from_dir(path)
 
         # the initial burn
         landscape = start_fire(landscape)
-        save_landscape(path, landscape, 0)
+        save_landscape(path, landscape, 0,func_type)
         if display:
             wf.show_landscape(landscape)
 
@@ -389,17 +429,105 @@ def burn_landscapes(dataset_dir=None, landscape_dir=None, max_time=20, num_perio
         elif func_type == 'original':
             # the original probability func
             prob_func = wf.make_calc_prob_fire(gamma=0.7)
+        
+ 
         else:
-            raise Exception('Unrecognized func_type', func_type)
-
+            #raise Exception('Unrecognized func_type', func_type)
+            # allow the actual function to be passed in as a param so we can use the GP function
+            prob_func = spread_prob_func
+            print(max_time)
         # burn the landscape sequentially num_periods times for max_time steps each burn.
         for i in range(1, num_periods+1):
-            landscape = wf.simulate_fire(landscape, max_time, prob_func, with_state_maps=False)
-            save_landscape(path, landscape, i)
+            # burn landscape based on todds or max's implementation
+            
+            # use max's implementation if none of the function type flags pass 
+            if func_type not in func_types:
+                landscape = wf.simulate_test_fire(landscape, max_time, prob_func, with_state_maps=False)
+            else:
+                landscape = wf.simulate_fire(landscape, max_time, prob_func, with_state_maps=False)
+            # for max's simulation functions
+
+            save_landscape(path, landscape,i,func_type)
             if display:
                 wf.show_landscape(landscape)
+                
+def burn_landscape_n_times(spread_prob_func,dataset_dir=None, landscape_dir=None, max_time=20, num_periods=1, seed=None, display=False,
+                    func_type='original'):
+    # reproducibility
+    if seed is not None:
+        np.random.seed(seed)
 
+    # burn either a single landscape or all the landscapes in a directory
+    if (dataset_dir and landscape_dir) or (not dataset_dir and not landscape_dir):
+        raise Exception('Please specify exactly one of dataset_dir or landscape_dir')
+    elif landscape_dir:
+        dirs = [Path(landscape_dir)]
+    else:
+        dirs = [d for d in Path(dataset_dir).iterdir() if d.is_dir()]
 
+    def save_landscape(path, landscape, i,func_type):
+        padded_i = str(i).zfill(len(str(num_periods)))  # e.g. num_periods=10, i=2, padded_i='02'
+        np.save(path / f'landscape_burn_{func_type}_{padded_i}.npy', landscape)
+
+    for path in dirs:
+        landscape = wf.make_landscape_from_dir(path)
+
+        # the initial burn
+        landscape = start_fire(landscape)
+        save_landscape(path, landscape, 0,func_type)
+        if display:
+            wf.show_landscape(landscape)
+
+        if func_type == 'dz_logits':
+            # spread driven by dz. biased against spreading downhill
+            prob_func = features.make_logits_fire_func(features.make_scaled_logits_func(
+                bias=-6, feature_scale=np.array([10.0, 0.0, 0.0, 0.0])
+            ))
+        elif func_type == 'wind_logits':
+            # spread driven by wind speed and direction
+            prob_func = features.make_logits_fire_func(features.make_scaled_logits_func(
+                bias=-6, feature_scale=np.array([0.0, 0.0, 0.0, 3.0])
+            ))
+        elif func_type == 'balanced_logits':
+            # NOTE, these weights are tuned to f=10, L=100, scale=400.
+            # feature scale: dz_scale, temperature_scale, humidity_scale, wind_scale
+            # spread driven by a balance of dz and wind
+            # dz is scaled to show moderate influence from topographical gradients in the standard landscape
+            # dz is scaled to have between ~1/8 and 8
+            # temperature is scaled to have between 0 and ~2.2 logits
+            # humidity is scaled to have between 0 and -2.2 logits
+            # wind is scaled to have between 1/8 and 7-10 logits
+            prob_func = features.make_logits_fire_func(features.make_scaled_logits_func(
+                bias=-7, feature_scale=np.array([6.0, 0.2, 0.2, 0.8])
+            ))
+        elif func_type == 'original':
+            # the original probability func
+            prob_func = wf.make_calc_prob_fire(gamma=0.7)
+        
+ 
+        else:
+            #raise Exception('Unrecognized func_type', func_type)
+            # allow the actual function to be passed in as a param so we can use the GP function
+            prob_func = spread_prob_func
+            print(max_time)
+        # burn the landscape sequentially num_periods times for max_time steps each burn.
+        for i in range(1, num_periods+1):
+            # burn landscape based on todds or max's implementation
+            
+            # use max's implementation if none of the function type flags pass 
+            if func_type not in func_types:
+                final_landscape = wf.simulate_test_fire(landscape, max_time, prob_func, with_state_maps=False)
+            else:
+                final_landscape = wf.simulate_fire(landscape, max_time, prob_func, with_state_maps=False)
+            # for max's simulation functions
+
+            save_landscape(path, final_landscape,i,func_type)
+            if display:
+                wf.show_landscape(final_landscape)
+
+                
+    
+                
 def main(*args):
     for fn in ('topography.npy', 'wind_speed.npy', 'temperature.npy', 'humidity.npy'):
         path = Path('data/synth_data/') / fn

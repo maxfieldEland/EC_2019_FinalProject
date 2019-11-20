@@ -11,6 +11,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from sklearn.metrics import jaccard_score
+import spread_functions as sp
 
 
 # Cell States
@@ -236,6 +237,8 @@ def simulate_fire(landscape, max_time, fire_func, with_state_maps=False):
             col = border_idx[1][i]
             hood = padded_landscape[tuple(neighborhoods[row, col])]
             # print(t, row, col, hood)  # confirm that neighborhoods of cells on landscape edges contain "nan" cells
+            
+            #Todds original 
             border_probs[i] = fire_func(hood)
 
         # spread fire
@@ -328,6 +331,142 @@ def output_state_maps(z_vals, state_maps, dirname='gif_fire'):
         figname = "gif_fire/{}.png".format(i)
         plt.savefig(figname)
         plt.close(fig)
+
+def feature_eng_function(func, neighborhood):
+    """
+    Construct features and call probability function to dertermine if a fire spreads from a neighborhood to a cell.
+    Sample call:
+        feature_eng_function(func, neighborhood)
+    Parameters:
+        :param lambda func: lamdba function pointing to algebraic expression
+        
+        :param neighborhood: ndarray of size 2x5x7 containing the indeces of the 7 layers of 5 cells in the neighborhood
+    Returns:
+        :return: probability of fire spreading.
+    """
+    
+    cell = neighborhood[0, :] # (fire, tree, z, temp, hum, windspeed, wind direction)
+    #neighbors = neighborhood[1:, :]
+    # caclulate mean values of environmental  from neighborhood
+    mean_temp = neighborhood[:, L_TEMP].mean()
+    mean_hum = neighborhood[:, L_HUM].mean()
+    delta_z = neighborhood[:, L_Z] - cell[L_Z]  # the vertical distance from cell to neighbor
+    # fire burns uphill faster, so weight fires below cell more and fires above cell less.
+
+    #mean_weighted_fire = np.mean(neighborhood[:, L_FIRE] * np.exp(-delta_z))
+    mean_weighted_fire = np.mean(neighborhood[:, L_FIRE] * delta_z)
+    
+    north_to_center = np.array([0.0, -1.0, 0.0, 1.0, 0.0])
+    # weight the contribution of an eastward wind in blowing fire in a neighborhood cell toward the center cell
+    east_to_center = np.array([0.0, 0.0, -1.0, 0.0, 1.0])
+    
+    # fire spreads with the wind faster than against the wind
+    east_wind = neighborhood[:, L_WS] * np.cos(neighborhood[:, L_WD])  # positive if wind blowing east
+    north_wind = neighborhood[:, L_WS] * np.sin(neighborhood[:, L_WD])  # positive if wind blowing north
+    center_wind = north_wind * north_to_center + east_wind * east_to_center
+    wind_term = np.nanmean(neighborhood[:, L_FIRE] * np.exp(center_wind))
+    args = (*cell[:5], mean_temp, mean_hum, mean_weighted_fire, wind_term)
+    
+    return func(*cell[:5], mean_temp, mean_hum, mean_weighted_fire,wind_term)
+
+    
+def simulate_test_fire(landscape, max_time, fire_func, with_state_maps=False):
+    """
+    Simulate a fire spreading over time.
+    
+    
+    Note : This is the same as simulate fire, except that it takes a specific spreading function as a parameter and uses 
+    feature_eng_function to engineer features before they are passed into a desired probability fun
+    
+    Sample call:
+        simulate_fire(landscape, 20, sp.generic_spreading)
+    Parameters:
+        :param ndarray landscape: 3 dimensional array containing the values (axis 2)
+                                  at each position (axis 0 and 1).
+        :param int max_time:     amount of time to run the simulation
+        :param with_state_maps: if True, return (landscape, state_maps). Otherwise return only the landscape.
+    Returns:
+        :return: the final landscape, or the final landscape and a list of state maps.
+    """
+    
+    # add padding so each cell in landscape has 4 neighbors, even cells on the edges of the landscape.
+    padded_landscape = np.pad(landscape, pad_width=((1, 1), (1, 1), (0, 0)), mode='constant', constant_values=np.nan)
+
+    # tuple(neighbors[i, j]) contains the indices of the neighborhood of cell (i, j).
+    neighborhoods = get_neighborhoods(padded_landscape)
+
+    # Store the initial state of the landscape
+    if with_state_maps:
+        state_maps = [get_state_layer(padded_landscape[1:-1, 1:-1])]
+
+    # BEGIN FIRE PROPOGATION
+    for t in range(max_time):
+
+        # what cells are trees that are not on fire but are bordering fire?
+        is_tree = padded_landscape[:, :, L_TREE] == 1
+        is_fire = padded_landscape[:, :, L_FIRE] == 1
+
+        is_fire_padded = np.pad(is_fire, 1, mode='constant', constant_values=False)
+        is_fire_north = is_fire_padded[:-2, 1:-1]  # a fire is north of cell (i, j) if cell (i-1, j) is on fire
+        is_fire_south = is_fire_padded[2:, 1:-1]
+        is_fire_east = is_fire_padded[1:-1, 2:]
+        is_fire_west = is_fire_padded[1:-1, :-2]
+        is_border = is_tree & np.logical_not(is_fire) & (is_fire_north | is_fire_south | is_fire_east | is_fire_west)
+        border_idx = np.nonzero(is_border)
+        border_size = len(border_idx[0])
+
+        # calculate spread probability for those locations
+        border_probs = np.zeros(border_size)
+        for i in range(border_size):
+            row = border_idx[0][i]
+            col = border_idx[1][i]
+            hood = padded_landscape[tuple(neighborhoods[row, col])]
+            # print(t, row, col, hood)  # confirm that neighborhoods of cells on landscape edges contain "nan" cells
+            
+            #Todds original 
+            border_probs[i] = sp.sigmoid(feature_eng_function(fire_func,hood))
+
+        # spread fire
+        border_fire = border_probs > np.random.random(border_size)
+        padded_landscape[border_idx[0][border_fire], border_idx[1][border_fire], L_FIRE] = 1
+        padded_landscape[border_idx[0][border_fire], border_idx[1][border_fire], L_TREE] = 0
+
+        # record the current state of the landscape
+        if with_state_maps:
+            state_maps.append(get_state_layer(padded_landscape[1:-1, 1:-1]))
+
+    if with_state_maps:
+        return padded_landscape[1:-1, 1:-1], state_maps
+    else:
+        return padded_landscape[1:-1, 1:-1]
+
+
+def multi_sim_iou_fitness(true_landscapes, pred_landscapes):
+    """
+    Note: This function returns the same results as `loss_function`, taking landscapes instead of
+    state maps to avoid the overhead of creating state maps from landscapes.
+    Compute the intersection over union of the true landscape and predicted landscape.
+    Perfect agreement is 1. Complete disagreement is 0. Take the average IoU for n simulations
+    Parameters:
+        :param true_landscape:
+        :param pred_landscape:
+    Returns:
+        :return: the mean IoU, a float between 0 and 1.
+    """
+    ious = []
+    for simulation_idx in range(len(pred_landscapes)):
+        
+        pred_landscape = pred_landscapes[simulation_idx]
+        true_landscape = true_landscapes[simulation_idx]
+    
+        trees_or_fire_idx = np.nonzero((true_landscape[:, :, L_FIRE] == 1) | (true_landscape[:, :, L_TREE] == 1))
+        y_true = true_landscape[:, :, L_FIRE][trees_or_fire_idx]
+        y_pred = pred_landscape[:, :, L_FIRE][trees_or_fire_idx]
+        iou = jaccard_score(y_true, y_pred)
+        ious.append(iou)
+    mean_iou = np.average(ious)
+    return mean_iou
+
 
 
 def main():
