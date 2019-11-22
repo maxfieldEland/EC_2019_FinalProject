@@ -36,6 +36,19 @@ L_WS = 5  # wind speed
 L_WD = 6  # wind direction
 
 
+def animate_fire(path, landscape, fire_func, max_time, n_sim=1):
+    '''
+    Animate a fire on a landscape. Save the animation to a file
+    :param landscape:
+    :param fire_func:
+    :param max_time:
+    :param n_sim: int. if > 1, animate the "cone of uncertainty" by overlaying multiple simulated burns
+    :return:
+    '''
+    pred_landscape, state_maps = simulate_fire(landscape, max_time, fire_func, with_state_maps=True)
+    raise NotImplementedError()
+
+
 def show_landscape(landscape):
     fig, ax = plt.subplots(figsize=(12, 8))  # 20, 20))
     # plot fire and trees
