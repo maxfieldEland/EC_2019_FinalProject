@@ -336,8 +336,8 @@ class LogisticModel(DeapModel):
 
 
 def protectedDiv(left, right):
-    if (right != 0):
-        return (left/right)
+    if right != 0:
+        return left / right
     else:
         return 1
 

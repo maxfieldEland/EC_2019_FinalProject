@@ -4,14 +4,16 @@ wildfire.py contains code for creating a landscape and simulating a forest fire 
 A landscape is a ndarray containing a layer for every feature -- cell state, height, humidity, ...
 """
 
-import sys
+import copy
+import matplotlib.animation as animation
+import matplotlib.colors as colors
+import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
-
-import matplotlib.pyplot as plt
-import matplotlib.colors as colors
 from sklearn.metrics import jaccard_score
 import spread_functions as sp
+import sys
+
 
 
 # Cell States
@@ -36,17 +38,76 @@ L_WS = 5  # wind speed
 L_WD = 6  # wind direction
 
 
-def animate_fire(path, landscape, fire_func, max_time, n_sim=1):
+def animate_fire(landscape, fire_func, max_time=20, n_sim=1, display=False, path=None):
     '''
-    Animate a fire on a landscape. Save the animation to a file
-    :param landscape:
-    :param fire_func:
-    :param max_time:
-    :param n_sim: int. if > 1, animate the "cone of uncertainty" by overlaying multiple simulated burns
+    Animate a fire on a landscape. Save the animation to a file.
+    :param landscape: the initial landscape to burn
+    :param fire_func: a fire spreading function
+    :param max_time: the number of time steps to simulate the fire.
+    :param n_sim: int. The number of simulations to run. If > 1, multiple simulated burns are overlayed,
+    creating a heatmap or distribution or "cone of uncertainty" effect.
+    :param display: bool. if True, show the animation
+    :param path: if not None, save the animation to this path.
     :return:
     '''
-    pred_landscape, state_maps = simulate_fire(landscape, max_time, fire_func, with_state_maps=True)
-    raise NotImplementedError()
+
+    # simulate n_sim fires
+    maps = []
+    for i in range(n_sim):
+        pred_landscape, state_maps = simulate_fire(copy.deepcopy(landscape), max_time, fire_func, with_state_maps=True)
+        maps.append(state_maps)  # state_maps is length max_time + 1
+
+    states = np.array(maps)  # shape: n_sim, max_time+1, n_row, n_col
+
+    # create the initial plot for animation
+    fig, ax = plt.subplots(figsize=(12, 8))
+    mean_state = states[:, 0, :, :].mean(axis=0)  # average initial state across all simulations
+
+    # Color Maps
+    # green values from the original colormap: 17, 128, 2
+    # red values from the original colormap: 252, 2, 7
+    # a nice yellow: 244, 250, 10
+    # a fiery orange: 240, 91, 11
+    # fire_color = np.array([252., 2, 7, 255]) / 255  # red fire
+    # fire_color = np.array([244., 250, 10, 255]) / 255  # yellow fire
+    fire_color = np.array([240., 91, 11, 255]) / 255  # orange fire
+    tree_color = np.array([17., 128, 2, 255]) / 255
+    reds = np.linspace(fire_color[0], tree_color[0], 100)
+    greens = np.linspace(fire_color[1], tree_color[1], 100)
+    blues = np.linspace(fire_color[2], tree_color[2], 100)
+    alphas = np.linspace(fire_color[3], tree_color[3], 100)
+    rgbas = np.stack([reds, greens, blues, alphas], axis=1)  # shape (100, 4)
+    cmap = colors.ListedColormap(rgbas)
+
+    im = ax.imshow(mean_state, cmap=cmap)
+    # plot topographic contours
+    z = landscape[:, :, L_Z]
+    contours = plt.contour(z)
+    clabels = plt.clabel(contours, inline=1, fontsize=10)
+    # plot wind arrows
+    radians = landscape[:, :, L_WD]
+    x = np.arange(0, landscape.shape[0], 1)[::10]
+    y = np.arange(0, landscape.shape[1], 1)[::10]
+    X, Y = np.meshgrid(x, y)
+    u = (landscape[:, :, L_WS] * np.cos(radians))[::10, ::10]  # scale the arrow size by wind speed
+    v = -(landscape[:, :, L_WS] * np.sin(radians))[::10, ::10]  # scale the arrow size by wind speed
+    arrows = ax.quiver(X, Y, u, v, scale=1, scale_units='xy', angles='xy')
+
+    def init():
+        return (im,) + tuple(contours.collections) + tuple(clabels) + (arrows, )
+
+    def animate(i_step):
+        mean_state = states[:, i_step, :, :].mean(axis=0)  # average state across all simulations
+        im.set_data(mean_state)
+        return (im,) + tuple(contours.collections) + tuple(clabels) + (arrows, )
+
+    frames = list(range(max_time + 1))  # animation frames, one per simulation time step
+    ani = animation.FuncAnimation(fig, animate, init_func=init, frames=frames, interval=100, blit=True)
+    if display:
+        plt.show()
+
+    if path is not None:
+        ani.save(path)
 
 
 def show_landscape(landscape):
@@ -64,12 +125,9 @@ def show_landscape(landscape):
     x = np.arange(0, landscape.shape[0], 1)[::10]
     y = np.arange(0, landscape.shape[1], 1)[::10]
     X, Y = np.meshgrid(x, y)
-    u = np.cos(radians)[::10, ::10]
-    v = np.sin(radians)[::10, ::10]
-    ax.quiver(X, Y, u, v)
-    # ax.xaxis.set_ticks([])
-    # ax.yaxis.set_ticks([])
-    # ax.set_aspect('equal')
+    u = (landscape[:, :, L_WS] * np.cos(radians))[::10, ::10]
+    v = -(landscape[:, :, L_WS] * np.sin(radians))[::10, ::10]
+    ax.quiver(X, Y, u, v, scale=1, scale_units='xy', angles='xy')
     plt.show()
 
 

@@ -13,43 +13,18 @@ time python mapsynth.py burn_landscapes --dataset-dir=foo --max-time=20 --num-pe
 '''
 
 import argparse
-from copy import deepcopy
-from deap import base
-from deap import creator
-from deap import tools
-from deap import gp
-from deap import algorithms
-import math
 import matplotlib.pyplot as plt
-import networkx as nx
 import numpy as np
-import operator
 from pathlib import Path
 from pprint import pprint
 import random
 from sklearn.model_selection import train_test_split
-from sklearn.utils.estimator_checks import check_estimator
 from sklearn.model_selection import GridSearchCV
 
-import features
 import wildfire
 import mapsynth
 from models import (GeneticProgrammingModel, ConstantModel, WindModel, LogisticModel, BalancedLogitsModel,
                     DzLogitsModel, WindLogitsModel)
-
-
-def make_evaluate_func(n_sim=1, max_time=20):
-    '''
-    Model expects an evaluate function with the signature `(x, y, fire_func)`.
-    This function makes that function from `evaluate(x, y, fire_func, n_sim, max_time)`,
-    and returns the function.
-    :return:
-    '''
-    def evaluate_func(x, y, fire_func):
-        # average fitness across multiple landscapes and multiple simulations
-        return wildfire.evaluate(x, y, fire_func, n_sim=n_sim, max_time=max_time)
-
-    return evaluate_func
 
 
 def run_grid_search(dataset_dir=None, landscape_dir=None, func_type='balanced_logits', n_rep=1, n_sim=1, max_time=20,
@@ -84,6 +59,7 @@ def run_grid_search(dataset_dir=None, landscape_dir=None, func_type='balanced_lo
         raise Exception('Unrecognized model_type for cross-validation', model_type)
 
     param_grid = {'pop_size': [2, 10], 'n_gen': [5, 10], 'cxpb': [0.0, 0.5], 'mutpb': [0.0, 0.5]}
+    param_grid = {'pop_size': [2, 10], 'n_gen': [5, 10]}
     print('param_grid:', param_grid)
     gs_model = GridSearchCV(model, param_grid, cv=5, iid=False, n_jobs=-1, refit=True, error_score=np.nan)
     gs_model.fit(x_train, y_train)

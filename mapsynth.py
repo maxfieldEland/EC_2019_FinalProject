@@ -38,18 +38,23 @@ Display a burned landscape:
 
 python mapsynth.py display_landscape_file --path=foo/landscape_00/landscape_burn_1.npy
 
+Animate a burn on a landscape dir:
+
+python mapsynth.py animate_landscape_burn --max-time=100 --display --func-type=balanced_logits --n-sim=10 --landscape-dir=dataset1/landscape_01 --path=burn.mp4
+
 
 """
 
 import argparse
 import copy
-from mpl_toolkits.mplot3d import Axes3D
+import features
 import matplotlib.pyplot as plt
+import models
+from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 from pathlib import Path
 import wildfire as wf
 from wildfire import L_FIRE, L_TREE, L_Z, L_TEMP, L_HUM, L_WS, L_WD, N_CENTER
-import features
 
 func_types = ['dz_logits','wind_logits','balanced_logits','original']
 
@@ -353,7 +358,7 @@ def start_fire(landscape):
     return landscape
 
 
-def make_initial_and_final_state(spreading_func,func_type,landscape_dir='data/synth_data/', max_time=20, seed=None, display=True):
+def make_initial_and_final_state(spreading_func, func_type, landscape_dir='data/synth_data/', max_time=20, seed=None, display=True):
     """
     Create a landscape, start an initial fire, simulate a burn for max_time time steps,
     and then save the initial fire and final fire landscapes.
@@ -378,12 +383,10 @@ def make_initial_and_final_state(spreading_func,func_type,landscape_dir='data/sy
     gamma = 0.7
     # determine which burn simulator to use
     if func_type not in func_types:
-        final_landscape, state_maps = wf.simulate_test_fire(landscape, max_time, spreading_func,
-                                                   with_state_maps=True)
+        final_landscape, state_maps = wf.simulate_test_fire(landscape, max_time, spreading_func, with_state_maps=True)
     else:
-        final_landscape, state_maps = wf.simulate_fire(landscape, max_time, spreading_func,
-                                                   with_state_maps=True)
-    #print(final_landscape)
+        final_landscape, state_maps = wf.simulate_fire(landscape, max_time, spreading_func, with_state_maps=True)
+
     # save initial and final landscapes
     np.save(landscape_path / 'init_landscape.npy', init_landscape)
     np.save(landscape_path / 'final_landscape.npy', final_landscape)
@@ -392,45 +395,14 @@ def make_initial_and_final_state(spreading_func,func_type,landscape_dir='data/sy
         wf.show_landscape(final_landscape)
 
 
-def make_synthetic_dataset(spreading_func,parent_dir, n, L, f, scale, max_time,func_type=None, seed=None):
+def make_synthetic_dataset(spreading_func, parent_dir, n, L, f, scale, max_time, func_type=None, seed=None):
     try:
         f = int(f)
     except ValueError:
         pass
     
     # determine spreading function for simulation
-    
-    if func_type == 'dz_logits':
-            # spread driven by dz. biased against spreading downhill
-            prob_func = features.make_logits_fire_func(features.make_scaled_logits_func(
-                bias=-6, feature_scale=np.array([10.0, 0.0, 0.0, 0.0])
-            ))
-    elif func_type == 'wind_logits':
-        # spread driven by wind speed and direction
-        prob_func = features.make_logits_fire_func(features.make_scaled_logits_func(
-            bias=-6, feature_scale=np.array([0.0, 0.0, 0.0, 3.0])
-        ))
-    elif func_type == 'balanced_logits':
-        # NOTE, these weights are tuned to f=10, L=100, scale=400.
-        # feature scale: dz_scale, temperature_scale, humidity_scale, wind_scale
-        # spread driven by a balance of dz and wind
-        # dz is scaled to show moderate influence from topographical gradients in the standard landscape
-        # dz is scaled to have between ~1/8 and 8
-        # temperature is scaled to have between 0 and ~2.2 logits
-        # humidity is scaled to have between 0 and -2.2 logits
-        # wind is scaled to have between 1/8 and 7-10 logits
-        prob_func = features.make_logits_fire_func(features.make_scaled_logits_func(
-            bias=-7, feature_scale=np.array([6.0, 0.2, 0.2, 0.8])
-        ))
-    elif func_type == 'original':
-        # the original probability func
-        prob_func = wf.make_calc_prob_fire(gamma=0.7)
-    
- 
-    else:
-        #raise Exception('Unrecognized func_type', func_type)
-        # allow the actual function to be passed in as a param so we can use the GP function
-        prob_func = spreading_func
+    prob_func = get_fire_func(spreading_func, func_type)
 
     # create a directory for this dataset based on the parameters
     dn = Path(parent_dir) / f'plain_n_{n}_L_{L}_f_{f}_scale_{scale}_max_time_{max_time}_seed_{seed}'
@@ -446,7 +418,7 @@ def make_synthetic_dataset(spreading_func,parent_dir, n, L, f, scale, max_time,f
         landscape_dir = dn / f'landscape_{padded_i}'
         landscape_dir.mkdir(parents=True, exist_ok=True)
         make_landscape_layers(landscape_dir, L=L, scale=scale, signal_range=(0, 10), noise_range=(0, 1))
-        make_initial_and_final_state(prob_func,func_type,landscape_dir, max_time, display=False)
+        make_initial_and_final_state(prob_func, func_type, landscape_dir, max_time, display=False)
 
 
 def make_landscapes(dataset_dir, n, L, scale, seed=None, display=False):
@@ -482,6 +454,46 @@ def save_landscape(path, landscape, i, num_periods, func_type=None):
         np.save(path / f'landscape_burn_{func_type}_{padded_i}.npy', landscape)
 
 
+def animate_landscape_burn(landscape_dir=None, max_time=20, n_sim=1, seed=None, display=False, func_type='original', path=None):
+    # reproducibility
+    if seed is not None:
+        np.random.seed(seed)
+
+    fire_func = get_fire_func(func_type=func_type)
+    landscape = wf.make_landscape_from_dir(landscape_dir)
+    landscape = start_fire(landscape)
+    wf.animate_fire(landscape, fire_func, max_time=max_time, n_sim=n_sim, display=display, path=path)
+
+
+def get_fire_func(fire_func=None, func_type=None):
+    '''
+    Return a fire spreading function based on func_type. If func_type is None, fire_func is returned.
+    '''
+    if fire_func is not None:
+        return fire_func
+    elif func_type == 'dz_logits':
+        # spread driven by dz. biased against spreading downhill
+        return models.DzLogitsModel().get_fire_func()
+    elif func_type == 'wind_logits':
+        # spread driven by wind speed and direction
+        return models.WindLogitsModel().get_fire_func()
+    elif func_type == 'balanced_logits':
+        # NOTE, these weights are tuned to f=10, L=100, scale=400.
+        # feature scale: dz_scale, temperature_scale, humidity_scale, wind_scale
+        # spread driven by a balance of dz and wind
+        # dz is scaled to show moderate influence from topographical gradients in the standard landscape
+        # dz is scaled to have between ~1/8 and 8
+        # temperature is scaled to have between 0 and ~2.2 logits
+        # humidity is scaled to have between 0 and -2.2 logits
+        # wind is scaled to have between 1/8 and 7-10 logits
+        return models.BalancedLogitsModel().get_fire_func()
+    elif func_type == 'original':
+        # the original probability func
+        return wf.make_calc_prob_fire(gamma=0.7)
+    else:
+        raise Exception('fire_func is None and func_type is not recognized', fire_func, func_type)
+
+
 def burn_landscapes(spread_prob_func=None, dataset_dir=None, landscape_dir=None, max_time=20, num_periods=1, seed=None, display=False,
                     func_type='original'):
     # reproducibility
@@ -500,36 +512,8 @@ def burn_landscapes(spread_prob_func=None, dataset_dir=None, landscape_dir=None,
         if display:
             wf.show_landscape(landscape)
 
-        if func_type == 'dz_logits':
-            # spread driven by dz. biased against spreading downhill
-            prob_func = features.make_logits_fire_func(features.make_scaled_logits_func(
-                bias=-6, feature_scale=np.array([10.0, 0.0, 0.0, 0.0])
-            ))
-        elif func_type == 'wind_logits':
-            # spread driven by wind speed and direction
-            prob_func = features.make_logits_fire_func(features.make_scaled_logits_func(
-                bias=-6, feature_scale=np.array([0.0, 0.0, 0.0, 3.0])
-            ))
-        elif func_type == 'balanced_logits':
-            # NOTE, these weights are tuned to f=10, L=100, scale=400.
-            # feature scale: dz_scale, temperature_scale, humidity_scale, wind_scale
-            # spread driven by a balance of dz and wind
-            # dz is scaled to show moderate influence from topographical gradients in the standard landscape
-            # dz is scaled to have between ~1/8 and 8
-            # temperature is scaled to have between 0 and ~2.2 logits
-            # humidity is scaled to have between 0 and -2.2 logits
-            # wind is scaled to have between 1/8 and 7-10 logits
-            prob_func = features.make_logits_fire_func(features.make_scaled_logits_func(
-                bias=-7, feature_scale=np.array([6.0, 0.2, 0.2, 0.8])
-            ))
-        elif func_type == 'original':
-            # the original probability func
-            prob_func = wf.make_calc_prob_fire(gamma=0.7)
-        else:
-            #raise Exception('Unrecognized func_type', func_type)
-            # allow the actual function to be passed in as a param so we can use the GP function
-            prob_func = spread_prob_func
-            print(max_time)
+        fire_func = get_fire_func(fire_func=spread_prob_func, func_type=func_type)
+        print(max_time)
 
         # burn the landscape sequentially num_periods times for max_time steps each burn.
         for i in range(1, num_periods+1):
@@ -537,9 +521,9 @@ def burn_landscapes(spread_prob_func=None, dataset_dir=None, landscape_dir=None,
             
             # use max's implementation if none of the function type flags pass 
             if func_type not in func_types:
-                landscape = wf.simulate_test_fire(landscape, max_time, prob_func, with_state_maps=False)
+                landscape = wf.simulate_test_fire(landscape, max_time, fire_func, with_state_maps=False)
             else:
-                landscape = wf.simulate_fire(landscape, max_time, prob_func, with_state_maps=False)
+                landscape = wf.simulate_fire(landscape, max_time, fire_func, with_state_maps=False)
             # for max's simulation functions
 
             save_landscape(path, landscape, i, num_periods, func_type=func_type)
@@ -685,6 +669,18 @@ if __name__ == '__main__':
     parser = subparsers.add_parser('plot_landscape_histograms_from_file', help='Display a landscape burn file')
     parser.add_argument('--path', help='npy file containing landscape')
     parser.set_defaults(func=plot_landscape_histograms_from_file)
+
+    parser = subparsers.add_parser('animate_landscape_burn')
+    parser.add_argument('--landscape-dir', help='directory containing landscape layers', default=None)
+    parser.add_argument('--max-time', type=int, help='The length of time to simulate the fire during each period')
+    parser.add_argument('--n-sim', type=int, help='The number of simulations.', default=1)
+    parser.add_argument('--seed', type=int, default=0,
+                        help='Used to seed the random number generator for reproducibility')
+    parser.add_argument('--display', default=False, action='store_true', help='Display the animation')
+    parser.add_argument('--func-type', default='original', choices=['original', 'balanced_logits', 'dz_logits',
+                                                                    'wind_logits'])
+    parser.add_argument('--path', help='where to save the animation')
+    parser.set_defaults(func=animate_landscape_burn)
 
 
     args = main_parser.parse_args()
