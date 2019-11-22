@@ -142,7 +142,7 @@ def get_init_and_final_landscape(landscape_dir):
 def load_dataset_burns(dataset_dir=None, landscape_dir=None, func_type=None):
     lds = get_landscape_dirs(dataset_dir=dataset_dir, landscape_dir=landscape_dir)
     landscapes = np.array([get_landscape_burns(ld, func_type=func_type) for ld in lds])
-    return landscapes  # shape: n_land, n_row, n_col, n_feat
+    return landscapes  # shape: n_land, n_burn, n_row, n_col, n_feat
 
 
 def get_landscape_burns(landscape_dir, func_type=None):
