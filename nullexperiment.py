@@ -1,9 +1,18 @@
 '''
 Animate a model from a results directory:
 
-    time python nullexperiment.py animate_results_model --landscape-dir=ds_400/landscape_0 \
+    time python nullexperiment.py animate_results_model --landscape-dir=ds_200/landscape_0 \
     --results-dir=results/grid_search_exp_dataset1 --i-rep=0 --display --model-type=constant \
-    --n-sim=1 --max-time=20
+    --n-sim=10 --max-time=200
+
+Test reading results of hyperparameter experiment:
+
+time python nullexperiment.py plot_hyperparam_search_results --results-dir=results/grid_search_exp_dataset1 --i-rep=0 --model-type=gp
+
+Test reading results of experiment
+
+time python nullexperiment.py plot_results_model --results-dir=results/grid_search_exp_dataset1 --i-rep=0 --model-type=gp
+
 
 '''
 
@@ -130,8 +139,8 @@ def run_grid_search_experiment(dataset_dir=None, out_dir=None, func_type='balanc
 
         param_grid = {'cxpb': np.linspace(0, 1, 11),
                       'mutpb': np.linspace(0, 1, 11)}
-        param_grid = {'cxpb': np.linspace(0, 1, 4),
-                      'mutpb': np.linspace(0, 1, 4),
+        param_grid = {'cxpb': np.linspace(0, 1, 2),
+                      'mutpb': np.linspace(0, 1, 2),
                       }
         print('param_grid:', param_grid)
         gs_model = GridSearchCV(model, param_grid, cv=5, iid=False, n_jobs=-1, refit=True, error_score=np.nan)
@@ -382,8 +391,6 @@ def animate_results_model(landscape_dir, results_dir, i_rep=0, model_type=None, 
         np.random.seed(seed)
 
     results = load_repetition_results(results_dir, i_rep, model_type)
-    print(results['fitnesses'])
-    print(results['log'])
     fire_func = results['best_model'].get_fire_func()
     landscape = wildfire.make_landscape_from_dir(landscape_dir)
     landscape = mapsynth.start_fire(landscape)
