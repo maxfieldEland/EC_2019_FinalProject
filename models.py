@@ -14,6 +14,7 @@ from pathlib import Path
 import random
 from sklearn.model_selection import train_test_split
 from sklearn.base import BaseEstimator
+import sys
 import features
 import wildfire
 import mapsynth
@@ -72,6 +73,37 @@ class DzLogitsModel(FixedLogitsModel):
         super().__init__(bias=-6, feature_scale=np.array([10.0, 0.0, 0.0, 0.0]), max_time=max_time)
 
 
+class EvaluateWildfire:
+    def __init__(self, x, y, model, n_sim=1, max_time=20, fitnesses=None):
+        """
+        Make a DEAP evaluation function, which takes an individual, creates a fire_func from self.get_fire_func,
+        runs wildfire.evaluate using x and y, and tracks the fitness via fitnesses.
+        :param x: initial landscapes
+        :param y: final landscapes
+        :param model: a WildfireModel object that has a `get_fire_func` method.
+        :param fitnesses: a list to which the wildfire.evaluate fitness is appended.
+        """
+        self.x = x
+        self.y = y
+        self.model = model
+        self.n_sim = n_sim
+        self.max_time = max_time
+        self.fitnesses = fitnesses if fitnesses is not None else []
+
+    def __call__(self, *args, **kwargs):
+        return self.evaluate(*args, **kwargs)
+
+    def evaluate(self, individual):
+        '''
+        DEAP individual fitness evaluation function.
+        :param individual: a population individual
+        :return: The fitness of the individual as a fitness tuple.
+        '''
+        fitness = wildfire.evaluate(self.x, self.y, self.model.get_fire_func(individual), self.n_sim, self.max_time)
+        self.fitnesses.append(fitness)
+        return fitness,  # return tuple for DEAP
+
+
 class DeapModel(WildfireModel):
     """
     A DeapModel, when fit to data, uses wildfire.evaluate to evaluate individual fire spreading
@@ -79,27 +111,6 @@ class DeapModel(WildfireModel):
     """
     def __init__(self, n_sim=1, max_time=20):
         super().__init__(max_time=max_time, n_sim=n_sim)
-
-    def make_evaluate(self, x, y, fitnesses):
-        '''
-        Make a DEAP evaluation which takes an individual, creates a fire_func from self.get_fire_func,
-        runs wildfire.evaluate using x and y, and tracks the fitness via fitnesses.
-        :param x: initial landscapes
-        :param y: final landscapes
-        :param fitnesses: a list to which the wildfire.evaluate fitness is appended.
-        :return:
-        '''
-        def evaluate(individual):
-            '''
-            DEAP individual fitness evaluation function.
-            :param individual: a population individual
-            :return: The fitness of the individual as a fitness tuple.
-            '''
-            fitness = wildfire.evaluate(x, y, self.get_fire_func(individual), self.n_sim, self.max_time)
-            fitnesses.append(fitness)
-            return fitness,  # return tuple for DEAP
-
-        return evaluate
 
 
 class ConstantModel(DeapModel):
@@ -114,8 +125,7 @@ class ConstantModel(DeapModel):
         self.mutpb = mutpb
 
     def get_fire_func(self, individual=None):
-        individual = individual if individual else self.hof[0]  # use best individual in hall of fame
-        prob = individual[0]
+        prob = individual[0] if individual else self.best_ind[0]
 
         def fire_func(neighborhood):
             return prob
@@ -154,8 +164,7 @@ class ConstantModel(DeapModel):
 
         # algorithm params
         toolbox.register('mate', tools.cxUniform, indpb=1.0)
-        fitnesses = []
-        evaluate = self.make_evaluate(x=X, y=y, fitnesses=fitnesses)
+        evaluate = EvaluateWildfire(x=X, y=y, model=self)
         toolbox.register("evaluate", evaluate)
         toolbox.register("select", tools.selRandom)
         toolbox.register("mutate", mutate)
@@ -176,10 +185,10 @@ class ConstantModel(DeapModel):
         print(hof)
 
         # save best model
-        self.hof = hof
-        self.best_ind = hof[0]
+        self.best_ind = np.array(hof[0])
         self.log = log
-        self.fitnesses = fitnesses
+        self.fitnesses = evaluate.fitnesses
+        return self
 
 
 class WindModel(DeapModel):
@@ -194,9 +203,9 @@ class WindModel(DeapModel):
         self.mutpb = mutpb
 
     def get_fire_func(self, individual=None):
-        individual = individual if individual else self.hof[0]  # use best individual in hall of fame
-        bias = individual[0]
-        feature_scale = np.array([0, 0, 0, individual[1]], dtype=float)  # use wind feature
+        bias = individual[0] if individual else self.best_ind[0]
+        wind_scale = individual[1] if individual else self.best_ind[1]
+        feature_scale = np.array([0, 0, 0, wind_scale], dtype=float)  # use wind feature
         fire_func = features.make_logits_fire_func(features.make_scaled_logits_func(bias, feature_scale))
         return fire_func
 
@@ -227,8 +236,7 @@ class WindModel(DeapModel):
 
         # algorithm params
         toolbox.register('mate', tools.cxTwoPoint)
-        fitnesses = []
-        evaluate = self.make_evaluate(x=X, y=y, fitnesses=fitnesses)
+        evaluate = EvaluateWildfire(x=X, y=y, model=self)
         toolbox.register("evaluate", evaluate)
         toolbox.register("select", tools.selTournament, tournsize=4)
         toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=2, indpb=0.5)
@@ -249,10 +257,9 @@ class WindModel(DeapModel):
         print(hof)
 
         # save best model
-        self.hof = hof
-        self.best_ind = hof[0]
+        self.best_ind = np.array(hof[0])
         self.log = log
-        self.fitnesses = fitnesses
+        self.fitnesses = evaluate.fitnesses
 
 
 
@@ -268,9 +275,9 @@ class LogisticModel(DeapModel):
         self.mutpb = mutpb
 
     def get_fire_func(self, individual=None):
-        individual = individual if individual else self.hof[0]  # use best individual in hall of fame
-        bias = individual[0]
-        feature_scale = np.array(individual[1:], dtype=float)  # use dz, temp, hum, wind features
+        bias = individual[0] if individual else self.best_ind[0]
+        # use dz, temp, hum, wind features
+        feature_scale = np.array(individual[1:] if individual else self.best_ind[1:], dtype=float)
         fire_func = features.make_logits_fire_func(features.make_scaled_logits_func(bias, feature_scale))
         return fire_func
 
@@ -307,8 +314,7 @@ class LogisticModel(DeapModel):
 
         # algorithm params
         toolbox.register('mate', tools.cxTwoPoint)
-        fitnesses = []
-        evaluate = self.make_evaluate(x=X, y=y, fitnesses=fitnesses)
+        evaluate = EvaluateWildfire(x=X, y=y, model=self)
         toolbox.register("evaluate", evaluate)
         toolbox.register("select", tools.selTournament, tournsize=tournsize)
         toolbox.register("mutate", tools.mutGaussian, mu=mut_mu, sigma=mut_sigma, indpb=indpb)
@@ -329,10 +335,9 @@ class LogisticModel(DeapModel):
         print(hof)
 
         # save best model
-        self.hof = hof
-        self.best_ind = hof[0]
+        self.best_ind = np.array(hof[0])
         self.log = log
-        self.fitnesses = fitnesses
+        self.fitnesses = evaluate.fitnesses
 
 
 def protectedDiv(left, right):
@@ -360,6 +365,38 @@ def ephemeral_normal(eph_const_sigma=1):
     return np.random.randn() * eph_const_sigma
 
 
+def compile(expr, arguments, context):
+    """
+    This code was copied from DEAP gp.py and modified slightly to be less DEAP specific.
+
+    Compile the expression *expr*.
+
+    :param expr: Expression to compile. It can either be a PrimitiveTree,
+                 a string of Python code or any object that when
+                 converted into string produced a valid Python code
+                 expression.
+    :param arguments: a list of argument names of expr.
+    :param context: the mapping of the function names in expr to functions (like locals())
+    :returns: a function if the primitive set has 1 or more arguments,
+              or return the results produced by evaluating the tree.
+    """
+    code = str(expr)
+    if len(arguments) > 0:
+        # This section is a stripped version of the lambdify
+        # function of SymPy 0.6.6.
+        args = ",".join(arg for arg in arguments)
+        code = "lambda {args}: {code}".format(args=args, code=code)
+    try:
+        return eval(code, context, {})
+    except MemoryError:
+        _, _, traceback = sys.exc_info()
+        raise MemoryError("DEAP : Error in tree evaluation :"
+                            " Python cannot evaluate a tree higher than 90. "
+                            "To avoid this problem, you should use bloat control on your "
+                            "operators. See the DEAP documentation for more information. "
+                            "DEAP will now abort.").with_traceback(traceback)
+
+
 class GeneticProgrammingModel(DeapModel):
     def __init__(self, n_sim=1, max_time=20, pop_size=10, n_gen=10, cxpb=0.5, mutpb=0.5):
         super().__init__(n_sim=n_sim, max_time=max_time)
@@ -375,10 +412,15 @@ class GeneticProgrammingModel(DeapModel):
         :param individual: a population member
         :return: a function
         """
-        individual = individual if individual else self.hof[0]  # use best individual in hall of fame
-        func = self.toolbox.compile(individual)
+        if individual:
+            func = compile(individual, arguments=self.compile_arguments, context=self.compile_context)
+        else:
+            func = compile(**self.best_ind)
 
         def feature_func(features):
+            """
+            :param features: ndarray of 4 features, from `features.make_logits_fire_func`.
+            """
             return func(*features)
 
         fire_func = features.make_logits_fire_func(feature_func)
@@ -416,15 +458,15 @@ class GeneticProgrammingModel(DeapModel):
         if not hasattr(creator, 'Individual'):
             creator.create("Individual", gp.PrimitiveTree, fitness=creator.FitnessMax, pset=pset)
 
-        self.toolbox = base.Toolbox()
-        toolbox = self.toolbox
+        toolbox = base.Toolbox()
         toolbox.register("expr", gp.genFull, pset=pset, min_=1, max_=3)
         toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.expr)
         toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-        toolbox.register("compile", gp.compile, pset=pset)
+        self.compile_context = dict(**pset.context)  # convert to normal objects for pickling
+        self.compile_arguments = list(pset.arguments)  # convert to normal objects for pickling
+        toolbox.register("compile", compile, arguments=self.compile_arguments, context=self.compile_context)
 
-        fitnesses = []
-        evaluate = self.make_evaluate(x=X, y=y, fitnesses=fitnesses)
+        evaluate = EvaluateWildfire(x=X, y=y, model=self)
         toolbox.register("evaluate", evaluate)
         toolbox.register("select", tools.selTournament, tournsize=3)
         toolbox.register("mate", gp.cxOnePoint)
@@ -450,13 +492,14 @@ class GeneticProgrammingModel(DeapModel):
         print('tree', tree)
         print('hof', hof)
         print('log', log)
-        print('fitnesses', fitnesses)
+        print('fitnesses', evaluate.fitnesses)
 
         # save best model
-        self.hof = hof
-        self.best_ind = hof[0]
-        self.best_tree = gp.PrimitiveTree(self.best_ind)
+        self.best_ind = {'expr': str(tree), 'context': self.compile_context, 'arguments': self.compile_arguments}
+        # self.hof = hof
+        # self.best_ind = hof[0]
+        # self.best_tree = gp.PrimitiveTree(self.best_ind)
         self.log = log
-        self.fitnesses = fitnesses
+        self.fitnesses = evaluate.fitnesses
 
 
