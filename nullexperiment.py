@@ -7,11 +7,16 @@ Animate a model from a results directory:
 
 Test reading results of hyperparameter experiment:
 
-time python nullexperiment.py plot_hyperparam_search_results --results-dir=results/grid_search_exp_dataset1 --i-rep=0 --model-type=gp
+time python nullexperiment.py plot_hyperparam_search_results --results-dir=results/grid_search_exp_dataset1 --i-rep=0 --model-type=logistic
 
 Test reading results of experiment
 
-time python nullexperiment.py plot_results_model --results-dir=results/grid_search_exp_dataset1 --i-rep=0 --model-type=gp
+time python nullexperiment.py plot_results_model --results-dir=results/grid_search_exp_dataset1 --i-rep=0 --model-type=logistic
+
+Run a hyperparameter experiment:
+
+time python nullexperiment.py run_grid_search_experiment --dataset-dir=dataset1 --out-dir=results/grid_search_exp_dataset1 --model-type=logistic --n-rep=1 --pop-size=4 --n-gen=2
+
 
 
 '''
@@ -139,9 +144,9 @@ def run_grid_search_experiment(dataset_dir=None, out_dir=None, func_type='balanc
 
         param_grid = {'cxpb': np.linspace(0, 1, 11),
                       'mutpb': np.linspace(0, 1, 11)}
-        param_grid = {'cxpb': np.linspace(0, 1, 2),
-                      'mutpb': np.linspace(0, 1, 2),
-                      }
+#         param_grid = {'cxpb': np.linspace(0, 1, 2),
+#                       'mutpb': np.linspace(0, 1, 2),
+#                       }
         print('param_grid:', param_grid)
         gs_model = GridSearchCV(model, param_grid, cv=5, iid=False, n_jobs=-1, refit=True, error_score=np.nan)
         gs_model.fit(x_train, y_train)

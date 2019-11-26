@@ -181,7 +181,7 @@ class ConstantModel(DeapModel):
         pop = toolbox.population(n=self.pop_size)
         hof = tools.HallOfFame(1)
         pop, log = algorithms.eaSimple(population=pop, toolbox=toolbox, cxpb=self.cxpb, mutpb=self.mutpb,
-                                       ngen=self.n_gen, stats=mstats, halloffame=hof, verbose=True)
+                                       ngen=self.n_gen, stats=mstats, halloffame=hof, verbose=False)
         print(hof)
 
         # save best model
@@ -253,7 +253,7 @@ class WindModel(DeapModel):
         pop = toolbox.population(n=self.pop_size)
         hof = tools.HallOfFame(1)
         pop, log = algorithms.eaSimple(population=pop, toolbox=toolbox, cxpb=self.cxpb, mutpb=self.mutpb,
-                                       ngen=self.n_gen, stats=mstats, halloffame=hof, verbose=True)
+                                       ngen=self.n_gen, stats=mstats, halloffame=hof, verbose=False)
         print(hof)
 
         # save best model
@@ -331,7 +331,7 @@ class LogisticModel(DeapModel):
         pop = toolbox.population(n=self.pop_size)
         hof = tools.HallOfFame(1)
         pop, log = algorithms.eaSimple(population=pop, toolbox=toolbox, cxpb=self.cxpb, mutpb=self.mutpb,
-                                       ngen=self.n_gen, stats=mstats, halloffame=hof, verbose=True)
+                                       ngen=self.n_gen, stats=mstats, halloffame=hof, verbose=False)
         print(hof)
 
         # save best model
