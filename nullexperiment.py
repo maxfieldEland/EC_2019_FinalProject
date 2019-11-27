@@ -93,7 +93,7 @@ def load_and_split_init_final_future_dataset(dataset_dir=None, func_type=None, t
 
 def run_grid_search_experiment(dataset_dir=None, out_dir=None, func_type='balanced_logits', n_sim=1,
                                max_time=20, seed=None, model_type='constant', pop_size=100, n_gen=100,
-                               i_rep=None, n_rep=1):
+                               i_rep=None, n_rep=1, debug=False):
     '''
     :param dataset_dir:
     :param out_dir:
@@ -142,11 +142,14 @@ def run_grid_search_experiment(dataset_dir=None, out_dir=None, func_type='balanc
         else:
             raise Exception('Unrecognized model_type for grid search cross-validation', model_type)
 
-        param_grid = {'cxpb': np.linspace(0, 1, 11),
-                      'mutpb': np.linspace(0, 1, 11)}
-#         param_grid = {'cxpb': np.linspace(0, 1, 2),
-#                       'mutpb': np.linspace(0, 1, 2),
-#                       }
+        if debug:
+            param_grid = {'cxpb': np.linspace(0, 1, 3),
+                          'mutpb': np.linspace(0, 1, 3),
+                          }
+        else:
+            param_grid = {'cxpb': np.linspace(0, 1, 11),
+                          'mutpb': np.linspace(0, 1, 11)}
+
         print('param_grid:', param_grid)
         gs_model = GridSearchCV(model, param_grid, cv=5, iid=False, n_jobs=-1, refit=True, error_score=np.nan)
         gs_model.fit(x_train, y_train)
@@ -426,6 +429,7 @@ if __name__ == '__main__':
     parser.add_argument('--n-rep', type=int, default=1, help='Run n repetitions of the experiment')
     parser.add_argument('--pop-size', type=int, default=100, help='Population size')
     parser.add_argument('--n-gen', type=int, default=100, help='Number of generations')
+    parser.add_argument('--debug', default=False, action='store_true', help='run a tiny experiment')
     parser.set_defaults(func=run_grid_search_experiment)
 
     parser = subparsers.add_parser('animate_results_model')
