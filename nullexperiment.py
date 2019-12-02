@@ -22,6 +22,7 @@ time python nullexperiment.py run_grid_search_experiment --dataset-dir=dataset1 
 '''
 
 import argparse
+import joblib  # easy parallel processes
 import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
@@ -89,6 +90,148 @@ def load_and_split_init_final_future_dataset(dataset_dir=None, func_type=None, t
     print('x_train.shape, x_test.shape, y_train.shape, y_test.shape')
     print(x_train.shape, x_test.shape, y_train.shape, y_test.shape)
     return x_train, x_test, y_train, y_test, future_train, future_test
+
+
+def get_hyperparameters(debug=False):
+    # This experiment is evaluating a grid of hyperparameters, one combination at a time.
+    if debug:
+        param_grid = {'cxpb': np.linspace(0, 1, 3),
+                      'mutpb': np.linspace(0, 1, 3),
+                      }
+    else:
+        param_grid = {'cxpb': np.linspace(0, 1, 11),
+                      'mutpb': np.linspace(0, 1, 11)}
+
+    hps = [{'cxpb': cxpb, 'mutpb': mutpb} for cxpb in param_grid['cxpb'] for mutpb in param_grid['mutpb']]
+    return hps
+
+
+def do_grid_search_rep(dataset_dir=None, out_dir=None, func_type='balanced_logits', n_sim=1,
+                       max_time=20, seed=None, model_type='constant', pop_size=100, n_gen=100,
+                       i_hp=0, i_rep=None, debug=False):
+    """
+    Load and the dataset and split into training and test. Split training into training and validation. Train
+    a model using the ith set of hyperparameters. Results will be saved in a file named after repetition index and
+    hyperparameter index.
+
+    Each repetition sets its own random seed, seed + i_rep.
+    :param dataset_dir:
+    :param out_dir:
+    :param func_type:
+    :param n_sim:
+    :param max_time:
+    :param seed:
+    :param model_type:
+    :param pop_size:
+    :param n_gen:
+    :param i_grid:
+    :param i_rep:
+    :param debug:
+    :return:
+    """
+    rep_seed = seed + i_rep + 2 if seed is not None else None
+    hps = get_hyperparameters(debug=debug)
+    mutpb = hps[i_hp]['mutpb']
+    cxpb = hps[i_hp]['cxpb']
+
+    print('do_grid_search_rep')
+    print(f'func_type {func_type}')
+    print(f'model_type {model_type}')
+    print(f'i_hp {i_hp}')
+    print(f'i_rep {i_rep}')
+    print(f'dataset_dir {dataset_dir}')
+    print(f'n_sim {n_sim}')
+    print(f'pop_size {pop_size}')
+    print(f'n_gen {n_gen}')
+    print(f'max_time {max_time}')
+    print(f'seed {seed}')
+    print(f'rep_seed {rep_seed}')
+    print(f'debug {debug}')
+    print(f'mutpb {mutpb}')
+    print(f'cxpb {cxpb}')
+
+    # initialize the results
+    results = {
+        'dataset_dir': dataset_dir,
+        'func_type': func_type, 'n_sim': n_sim, 'max_time': max_time,
+        'seed': seed, 'rep_seed': rep_seed, 'i_hp': i_hp, 'i_rep': i_rep,
+        'model_type': model_type, 'out_dir': out_dir,
+        'pop_size': pop_size, 'n_gen': n_gen, 'mutpb': mutpb, 'cxpb': cxpb,
+    }
+
+    # Load Dataset
+    # Use the same seed for train-test split, so we never touch test during hyperparameter tuning.
+    np.random.seed(seed)
+    random.seed(seed + 1 if seed is not None else None)
+    x_train, x_test, y_train, y_test, future_train, future_test = load_and_split_init_final_future_dataset(
+        dataset_dir=dataset_dir, func_type=func_type)
+    print(f'x_train.shape: {x_train.shape}, x_test.shape: {x_test.shape}')
+    print(f'y_train.shape: {y_train.shape}, y_test.shape: {y_test.shape}')
+    print(f'future_train.shape: {future_train.shape}, future_test.shape: {future_test.shape}')
+
+    # Monte carlo cross-validation
+    # https://en.wikipedia.org/wiki/Cross-validation_(statistics)#Repeated_random_sub-sampling_validation
+    # Use a repetition specific split of train into training and validation sets
+    np.random.seed(rep_seed)
+    random.seed(rep_seed + 1 if rep_seed is not None else None)
+    x_cv_train, x_cv_test, y_cv_train, y_cv_test, future_cv_train, future_cv_test = train_test_split(
+        x_train, y_train, future_train, test_size=1/2)
+    print(f'x_cv_train.shape: {x_cv_train.shape}, x_cv_test.shape: {x_cv_test.shape}')
+    print(f'y_cv_train.shape: {y_cv_train.shape}, y_cv_test.shape: {y_cv_test.shape}')
+    print(f'future_cv_train.shape: {future_cv_train.shape}, future_cv_test.shape: {future_cv_test.shape}')
+
+    if model_type == 'gp':
+        model = GeneticProgrammingModel(
+            n_sim=n_sim, max_time=max_time, pop_size=pop_size, n_gen=n_gen, cxpb=cxpb, mutpb=mutpb)
+    elif model_type == 'constant':
+        model = ConstantModel(
+            n_sim=n_sim, max_time=max_time, pop_size=pop_size, n_gen=n_gen, cxpb=cxpb, mutpb=mutpb)
+    elif model_type == 'logistic':
+        model = LogisticModel(
+            n_sim=n_sim, max_time=max_time, pop_size=pop_size, n_gen=n_gen, cxpb=cxpb, mutpb=mutpb)
+    else:
+        raise Exception('Unrecognized model_type for grid search cross-validation', model_type)
+
+    # train model
+    model.fit(x_cv_train, y_cv_train)
+
+    # evaluate model
+    train_fitness, test_fitness, future_train_fitness, future_test_fitness = evaluate_model_on_final_and_future(
+        model, x_cv_train, x_cv_test, y_cv_train, y_cv_test, future_cv_train, future_cv_test)
+
+    for attr in ['best_ind', 'log', 'fitnesses']:
+        if hasattr(model, attr):
+            value = getattr(model, attr)
+            results[attr] = value
+            print(attr)
+            print(value)
+        else:
+            print(f'model does not have attribute: {attr}')
+
+    results.update({'train_fitness': train_fitness, 'test_fitness': test_fitness,
+                    'future_train_fitness': future_train_fitness, 'future_test_fitness': future_test_fitness,
+                    'model': model})
+
+    # Save Results
+    save_repetition_results(results, out_dir, i_rep, model_type, i_hp=i_hp)
+
+
+def run_grid_search_experiment_2(dataset_dir=None, out_dir=None, func_type='balanced_logits', n_sim=1,
+                               max_time=20, seed=None, model_type='constant', pop_size=100, n_gen=100,
+                               i_rep=None, n_rep=1, debug=False):
+    """
+    Run a grid search for mutation rate and crossover rate for the constant model or logistic model or gp model.
+    """
+    hps = get_hyperparameters(debug=debug)
+
+    # run a single rep or all the reps
+    i_reps = [i_rep] if i_rep is not None else list(range(n_rep))
+
+    for i_rep in i_reps:
+        joblib.Parallel(n_jobs=-1)(joblib.delayed(do_grid_search_rep)(
+            dataset_dir=dataset_dir, out_dir=out_dir, func_type=func_type, n_sim=n_sim, max_time=max_time,
+            seed=seed, model_type=model_type, pop_size=pop_size, n_gen=n_gen, i_hp=i_hp, i_rep=i_rep, debug=debug)
+                                  for i_hp in range(len(hps)))
 
 
 def run_grid_search_experiment(dataset_dir=None, out_dir=None, func_type='balanced_logits', n_sim=1,
@@ -290,12 +433,12 @@ def process_results():
     plt.show()
 
 
-def repetition_results_path(results_dir, i_rep=0, model_type=None):
-    basename = f'results_model_{model_type}_rep_{i_rep}'
+def repetition_results_path(results_dir, i_rep=0, model_type=None, i_hp=None):
+    basename = f'results_model_{model_type}_rep_{i_rep}' + (f'_hp_{i_hp}' if i_hp is not None else '')
     return Path(results_dir) / basename
 
 
-def save_repetition_results(results, out_dir=None, i_rep=0, model_type=None):
+def save_repetition_results(results, out_dir=None, i_rep=0, model_type=None, i_hp=None):
     '''
     Save results to a pickle located in out_dir, named after the repetition number.
     :param out_dir:
@@ -304,15 +447,15 @@ def save_repetition_results(results, out_dir=None, i_rep=0, model_type=None):
     :return:
     '''
     if out_dir is not None:
-        path = repetition_results_path(out_dir, i_rep, model_type)
+        path = repetition_results_path(out_dir, i_rep, model_type, i_hp)
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, 'wb') as fh:
             print(f'Saving results for repetition {i_rep} to {path}')
             pickle.dump(results, fh)
 
 
-def load_repetition_results(results_dir, i_rep=0, model_type=None):
-    path = repetition_results_path(results_dir, i_rep, model_type)
+def load_repetition_results(results_dir, i_rep=0, model_type=None, i_hp=None):
+    path = repetition_results_path(results_dir, i_rep, model_type, i_hp)
     with open(path, 'rb') as fh:
         print(f'Loading results for repetition {i_rep} from {path}')
         return pickle.load(fh)
@@ -432,6 +575,19 @@ if __name__ == '__main__':
     parser.add_argument('--debug', default=False, action='store_true', help='run a tiny experiment')
     parser.set_defaults(func=run_grid_search_experiment)
 
+    parser = subparsers.add_parser('run_grid_search_experiment_2')
+    parser.add_argument('--dataset-dir', help='directory containing landscape directories', default=None)
+    parser.add_argument('--seed', type=int, default=0,
+                        help='Used to seed the random number generator for reproducibility')
+    parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
+    parser.add_argument('--out-dir', help='directory in which to save the results file of every repetition', default=None)
+    parser.add_argument('--i-rep', type=int, default=None, help='Run the ith repetition of the experiment. ')
+    parser.add_argument('--n-rep', type=int, default=1, help='Run n repetitions of the experiment')
+    parser.add_argument('--pop-size', type=int, default=100, help='Population size')
+    parser.add_argument('--n-gen', type=int, default=100, help='Number of generations')
+    parser.add_argument('--debug', default=False, action='store_true', help='run a tiny experiment')
+    parser.set_defaults(func=run_grid_search_experiment_2)
+
     parser = subparsers.add_parser('animate_results_model')
     parser.add_argument('--landscape-dir', help='directory containing landscape layers', default=None)
     parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
@@ -456,9 +612,19 @@ if __name__ == '__main__':
     parser.add_argument('--i-rep', type=int, default=None, help='Run the ith repetition of the experiment. ')
     parser.set_defaults(func=plot_hyperparam_search_results)
 
-
-
-
+    parser = subparsers.add_parser('do_grid_search_rep')
+    parser.add_argument('--dataset-dir', help='directory containing landscape directories', default=None)
+    parser.add_argument('--seed', type=int, default=0,
+                        help='Used to seed the random number generator for reproducibility')
+    parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
+    parser.add_argument('--out-dir', help='directory in which to save the results file of every repetition', default=None)
+    parser.add_argument('--i-rep', type=int, default=None, help='Run the ith repetition of the experiment. ')
+    parser.add_argument('--i-hp', type=int, default=None,
+                        help='Evaluate the ith parameter combination in the parameter grid')
+    parser.add_argument('--pop-size', type=int, default=100, help='Population size')
+    parser.add_argument('--n-gen', type=int, default=100, help='Number of generations')
+    parser.add_argument('--debug', default=False, action='store_true', help='run a tiny experiment')
+    parser.set_defaults(func=do_grid_search_rep)
 
     args = main_parser.parse_args()
     func = args.func
