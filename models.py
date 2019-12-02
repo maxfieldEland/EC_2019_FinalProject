@@ -238,7 +238,7 @@ class WindModel(DeapModel):
         toolbox.register('mate', tools.cxTwoPoint)
         evaluate = EvaluateWildfire(x=X, y=y, model=self)
         toolbox.register("evaluate", evaluate)
-        toolbox.register("select", tools.selTournament, tournsize=4)
+        toolbox.register("select", tools.selTournament, tournsize=2)
         toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=2, indpb=0.5)
 
         # statistics
@@ -291,7 +291,7 @@ class LogisticModel(DeapModel):
 
         n_gene = 5 # one gene for each of: bias and 4 feature coefficients
         indpb = 1 / n_gene  # expected number of mutated loci per genome = 1
-        tournsize = 4
+        tournsize = 2
         mut_mu = 0
         mut_sigma = 1
 
@@ -468,7 +468,7 @@ class GeneticProgrammingModel(DeapModel):
 
         evaluate = EvaluateWildfire(x=X, y=y, model=self)
         toolbox.register("evaluate", evaluate)
-        toolbox.register("select", tools.selTournament, tournsize=3)
+        toolbox.register("select", tools.selTournament, tournsize=2)
         toolbox.register("mate", gp.cxOnePoint)
         toolbox.register("expr_mut", gp.genFull, min_=0, max_=2)
         toolbox.register("mutate", gp.mutUniform, expr=toolbox.expr_mut, pset=pset)
