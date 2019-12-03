@@ -217,8 +217,8 @@ def do_grid_search_rep(dataset_dir=None, out_dir=None, func_type='balanced_logit
 
 
 def run_grid_search_experiment_2(dataset_dir=None, out_dir=None, func_type='balanced_logits', n_sim=1,
-                               max_time=20, seed=None, model_type='constant', pop_size=100, n_gen=100,
-                               i_rep=None, n_rep=1, debug=False):
+                                 max_time=20, seed=None, model_type='constant', pop_size=100, n_gen=100,
+                                 i_rep=None, n_rep=1, debug=False):
     """
     Run a grid search for mutation rate and crossover rate for the constant model or logistic model or gp model.
     """
@@ -353,12 +353,103 @@ def run_grid_search_experiment(dataset_dir=None, out_dir=None, func_type='balanc
         save_repetition_results(results, out_dir, i_rep, model_type)
 
 
-def run_experiment(dataset_dir=None, landscape_dir=None, func_type='balanced_logits', n_rep=None,
-                   seed=None, model_type='constant', out_dir=None, i_rep=None):
+def do_experiment_rep(dataset_dir=None, out_dir=None, func_type='balanced_logits', n_sim=1,
+                      max_time=20, seed=None, model_type='constant', pop_size=100, n_gen=100,
+                      mutpb=0.5, cxpb=0.5, i_rep=None, debug=False):
+    rep_seed = seed + i_rep + 2 if seed is not None else None
+
+    print('do_experiment_rep')
+    print(f'func_type {func_type}')
+    print(f'model_type {model_type}')
+    print(f'i_rep {i_rep}')
+    print(f'dataset_dir {dataset_dir}')
+    print(f'n_sim {n_sim}')
+    print(f'pop_size {pop_size}')
+    print(f'n_gen {n_gen}')
+    print(f'max_time {max_time}')
+    print(f'seed {seed}')
+    print(f'rep_seed {rep_seed}')
+    print(f'debug {debug}')
+    print(f'mutpb {mutpb}')
+    print(f'cxpb {cxpb}')
+
+    # initialize the results
+    results = {
+        'dataset_dir': dataset_dir,
+        'func_type': func_type, 'n_sim': n_sim, 'max_time': max_time,
+        'seed': seed, 'rep_seed': rep_seed, 'i_rep': i_rep,
+        'model_type': model_type, 'out_dir': out_dir,
+        'pop_size': pop_size, 'n_gen': n_gen, 'mutpb': mutpb, 'cxpb': cxpb,
+    }
+
+    # Load Dataset
+    # Use the same seed for train-test split, so the test set is consistent.
+    np.random.seed(seed)
+    random.seed(seed + 1 if seed is not None else None)
+    x_train, x_test, y_train, y_test, future_train, future_test = load_and_split_init_final_future_dataset(
+        dataset_dir=dataset_dir, func_type=func_type)
+    print(f'x_train.shape: {x_train.shape}, x_test.shape: {x_test.shape}')
+    print(f'y_train.shape: {y_train.shape}, y_test.shape: {y_test.shape}')
+    print(f'future_train.shape: {future_train.shape}, future_test.shape: {future_test.shape}')
+
+    # Use a different seed for every repetition
+    np.random.seed(rep_seed)
+    random.seed(rep_seed + 1 if rep_seed is not None else None)
+
+    if model_type == 'gp':
+        model = GeneticProgrammingModel(
+            n_sim=n_sim, max_time=max_time, pop_size=pop_size, n_gen=n_gen, cxpb=cxpb, mutpb=mutpb)
+    elif model_type == 'constant':
+        model = ConstantModel(
+            n_sim=n_sim, max_time=max_time, pop_size=pop_size, n_gen=n_gen, cxpb=cxpb, mutpb=mutpb)
+    elif model_type == 'logistic':
+        model = LogisticModel(
+            n_sim=n_sim, max_time=max_time, pop_size=pop_size, n_gen=n_gen, cxpb=cxpb, mutpb=mutpb)
+    else:
+        raise Exception('Unrecognized model_type for grid search cross-validation', model_type)
+
+    # train model
+    model.fit(x_train, y_train)
+
+    # evaluate model
+    train_fitness, test_fitness, future_train_fitness, future_test_fitness = evaluate_model_on_final_and_future(
+        model, x_train, x_test, y_train, y_test, future_train, future_test)
+
+    for attr in ['best_ind', 'log', 'fitnesses']:
+        if hasattr(model, attr):
+            value = getattr(model, attr)
+            results[attr] = value
+            print(attr)
+            print(value)
+        else:
+            print(f'model does not have attribute: {attr}')
+
+    results.update({'train_fitness': train_fitness, 'test_fitness': test_fitness,
+                    'future_train_fitness': future_train_fitness, 'future_test_fitness': future_test_fitness,
+                    'model': model})
+
+    # Save Results
+    save_repetition_results(results, out_dir, i_rep, model_type)
+
+
+def run_experiment(dataset_dir=None, out_dir=None, func_type='balanced_logits', n_sim=1, max_time=20, seed=None,
+                   model_type='constant', pop_size=100, n_gen=100, mutpb=0.5, cxpb=0.5, i_rep=None, n_rep=1,
+                   debug=False):
     """
     Run n_rep repetitions of the experiment, using the model_type model. Or if i_rep is specified, run the ith
     repetition of the experiment. Use the func_type burn type.
     """
+
+    # run a single rep or all the reps
+    i_reps = [i_rep] if i_rep is not None else list(range(n_rep))
+
+    joblib.Parallel(n_jobs=-1)(joblib.delayed(do_experiment_rep)(
+        dataset_dir=dataset_dir, out_dir=out_dir, func_type=func_type, n_sim=n_sim, max_time=max_time,
+        seed=seed, model_type=model_type, pop_size=pop_size, n_gen=n_gen, mutpb=mutpb, cxpb=cxpb,
+        i_rep=i_rep, debug=debug) for i_rep in i_reps)
+
+
+def run_experiment_old():
     # Experimental Parameters
     pop_size = 100
     n_gen = 100
@@ -559,7 +650,12 @@ if __name__ == '__main__':
     parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
     parser.add_argument('--out-dir', help='directory in which to save the results file of every repetition', default=None)
     parser.add_argument('--i-rep', type=int, default=None, help='Run the ith repetition of the experiment. ')
-    parser.add_argument('--n-rep', type=int, default=None, help='Run n repetitions of the experiment')
+    parser.add_argument('--n-rep', type=int, default=1, help='Run n repetitions of the experiment')
+    parser.add_argument('--pop-size', type=int, default=100, help='Population size')
+    parser.add_argument('--n-gen', type=int, default=100, help='Number of generations')
+    parser.add_argument('--mutpb', type=float, default=0.5, help='mutation rate')
+    parser.add_argument('--cxpb', type=float, default=0.5, help='crossover rate')
+    parser.add_argument('--debug', default=False, action='store_true', help='run a tiny experiment')
     parser.set_defaults(func=run_experiment)
 
     parser = subparsers.add_parser('run_grid_search_experiment')
