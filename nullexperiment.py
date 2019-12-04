@@ -396,17 +396,21 @@ def do_experiment_rep(dataset_dir=None, out_dir=None, func_type='balanced_logits
     np.random.seed(rep_seed)
     random.seed(rep_seed + 1 if rep_seed is not None else None)
 
-    if model_type == 'gp':
-        model = GeneticProgrammingModel(
-            n_sim=n_sim, max_time=max_time, pop_size=pop_size, n_gen=n_gen, cxpb=cxpb, mutpb=mutpb)
-    elif model_type == 'constant':
-        model = ConstantModel(
-            n_sim=n_sim, max_time=max_time, pop_size=pop_size, n_gen=n_gen, cxpb=cxpb, mutpb=mutpb)
-    elif model_type == 'logistic':
-        model = LogisticModel(
-            n_sim=n_sim, max_time=max_time, pop_size=pop_size, n_gen=n_gen, cxpb=cxpb, mutpb=mutpb)
-    else:
-        raise Exception('Unrecognized model_type for grid search cross-validation', model_type)
+    # if model_type == 'gp':
+    #     model = GeneticProgrammingModel(
+    #         n_sim=n_sim, max_time=max_time, pop_size=pop_size, n_gen=n_gen, cxpb=cxpb, mutpb=mutpb)
+    # elif model_type == 'constant':
+    #     model = ConstantModel(
+    #         n_sim=n_sim, max_time=max_time, pop_size=pop_size, n_gen=n_gen, cxpb=cxpb, mutpb=mutpb)
+    # elif model_type == 'logistic':
+    #     model = LogisticModel(
+    #         n_sim=n_sim, max_time=max_time, pop_size=pop_size, n_gen=n_gen, cxpb=cxpb, mutpb=mutpb)
+    # else:
+    #     raise Exception('Unrecognized model_type for grid search cross-validation', model_type)
+
+    # model
+    model = get_model(model_type, n_sim=n_sim, max_time=max_time, pop_size=pop_size, n_gen=n_gen,
+                      cxpb=cxpb, mutpb=mutpb)
 
     # train model
     model.fit(x_train, y_train)
