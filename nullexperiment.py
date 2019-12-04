@@ -31,6 +31,7 @@ from pprint import pprint
 import random
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import GridSearchCV
+from itertools import count
 
 import wildfire
 import mapsynth
@@ -78,6 +79,16 @@ def evaluate_model_on_final_and_future(model, x_train, x_test, y_train, y_test, 
 
     return train_fitness, test_fitness, future_train_fitness, future_test_fitness
 
+def evaluate_timesteps(model, x_train, x_test, y_train, y_test):
+    pred_train = model.predict(x_train)
+    train_fitness = wildfire.multi_sim_iou_fitness(y_train, pred_train)
+    pred_test = model.predict(x_test)
+    test_fitness = wildfire.multi_sim_iou_fitness(y_test, pred_test)
+    print(f'train_fitness {train_fitness}')
+    print(f'test_fitness {test_fitness}')
+
+    return train_fitness, test_fitness
+
 
 def load_and_split_init_final_future_dataset(dataset_dir=None, func_type=None, test_size=0.5):
     # load dataset, shape = n_land, n_row, n_col, n_feat
@@ -91,6 +102,23 @@ def load_and_split_init_final_future_dataset(dataset_dir=None, func_type=None, t
     print(x_train.shape, x_test.shape, y_train.shape, y_test.shape)
     return x_train, x_test, y_train, y_test, future_train, future_test
 
+def load_and_split_timesteps(dataset_dir = None, func_type = None, test_size = 0.5):
+    x = []
+    y = []
+    
+    for i in count(0):
+        try:
+            y.append(mapsynth.load_dataset_burn_i(i + 1, dataset_dir = dataset_dir, func_type = func_type))
+            x.append(mapsynth.load_dataset_burn_i(i, dataset_dir = dataset_dir, func_type = func_type))
+        except:
+            break
+
+    x = np.vstack(x)
+    y = np.vstack(y)
+
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = test_size)
+
+    return x_train, x_test, y_train, y_test
 
 def get_hyperparameters(debug=False):
     # This experiment is evaluating a grid of hyperparameters, one combination at a time.
@@ -353,7 +381,7 @@ def run_grid_search_experiment(dataset_dir=None, out_dir=None, func_type='balanc
         save_repetition_results(results, out_dir, i_rep, model_type)
 
 
-def do_experiment_rep(dataset_dir=None, out_dir=None, func_type='balanced_logits', n_sim=1,
+def do_experiment_rep(dataset_dir=None, out_dir=None, dtype = 'initfinal', func_type='balanced_logits', n_sim=1,
                       max_time=20, seed=None, model_type='constant', pop_size=100, n_gen=100,
                       mutpb=0.5, cxpb=0.5, i_rep=None, debug=False):
     rep_seed = seed + i_rep + 2 if seed is not None else None
@@ -386,11 +414,17 @@ def do_experiment_rep(dataset_dir=None, out_dir=None, func_type='balanced_logits
     # Use the same seed for train-test split, so the test set is consistent.
     np.random.seed(seed)
     random.seed(seed + 1 if seed is not None else None)
-    x_train, x_test, y_train, y_test, future_train, future_test = load_and_split_init_final_future_dataset(
-        dataset_dir=dataset_dir, func_type=func_type)
-    print(f'x_train.shape: {x_train.shape}, x_test.shape: {x_test.shape}')
-    print(f'y_train.shape: {y_train.shape}, y_test.shape: {y_test.shape}')
-    print(f'future_train.shape: {future_train.shape}, future_test.shape: {future_test.shape}')
+
+    if (dtype == 'initfinal'):
+        x_train, x_test, y_train, y_test, future_train, future_test = load_and_split_init_final_future_dataset(
+            dataset_dir=dataset_dir, func_type=func_type)
+
+        print(f'x_train.shape: {x_train.shape}, x_test.shape: {x_test.shape}')
+        print(f'y_train.shape: {y_train.shape}, y_test.shape: {y_test.shape}')
+        print(f'future_train.shape: {future_train.shape}, future_test.shape: {future_test.shape}')
+
+    elif (dtype == 'timesteps'):
+        x_train, x_test, y_train, y_test = load_and_split_timesteps(dataset_dir=dataset_dir, func_type = func_type)
 
     # Use a different seed for every repetition
     np.random.seed(rep_seed)
@@ -412,8 +446,18 @@ def do_experiment_rep(dataset_dir=None, out_dir=None, func_type='balanced_logits
     model.fit(x_train, y_train)
 
     # evaluate model
-    train_fitness, test_fitness, future_train_fitness, future_test_fitness = evaluate_model_on_final_and_future(
-        model, x_train, x_test, y_train, y_test, future_train, future_test)
+    if (dtype == 'initfinal'):
+        train_fitness, test_fitness, future_train_fitness, future_test_fitness = evaluate_model_on_final_and_future(
+            model, x_train, x_test, y_train, y_test, future_train, future_test)
+
+        results.update({'train_fitness': train_fitness, 'test_fitness': test_fitness,
+                    'future_train_fitness': future_train_fitness, 'future_test_fitness': future_test_fitness,
+                    'model': model})
+    elif (dtype == 'timesteps'):
+        train_fitness, test_fitness = evaluate_timesteps(model, x_train, x_test, y_train, y_test)
+
+        results.update({'train_fitness': train_fitness, 'test_fitness': test_fitness,
+                    'model': model})
 
     for attr in ['best_ind', 'log', 'fitnesses']:
         if hasattr(model, attr):
@@ -424,15 +468,11 @@ def do_experiment_rep(dataset_dir=None, out_dir=None, func_type='balanced_logits
         else:
             print(f'model does not have attribute: {attr}')
 
-    results.update({'train_fitness': train_fitness, 'test_fitness': test_fitness,
-                    'future_train_fitness': future_train_fitness, 'future_test_fitness': future_test_fitness,
-                    'model': model})
-
     # Save Results
     save_repetition_results(results, out_dir, i_rep, model_type)
 
 
-def run_experiment(dataset_dir=None, out_dir=None, func_type='balanced_logits', n_sim=1, max_time=20, seed=None,
+def run_experiment(dataset_dir=None, out_dir=None, dtype='initfinal', func_type='balanced_logits', n_sim=1, max_time=20, seed=None,
                    model_type='constant', pop_size=100, n_gen=100, mutpb=0.5, cxpb=0.5, i_rep=None, n_rep=1,
                    debug=False):
     """
@@ -444,75 +484,9 @@ def run_experiment(dataset_dir=None, out_dir=None, func_type='balanced_logits', 
     i_reps = [i_rep] if i_rep is not None else list(range(n_rep))
 
     joblib.Parallel(n_jobs=-1)(joblib.delayed(do_experiment_rep)(
-        dataset_dir=dataset_dir, out_dir=out_dir, func_type=func_type, n_sim=n_sim, max_time=max_time,
+        dataset_dir=dataset_dir, out_dir=out_dir, dtype=dtype, func_type=func_type, n_sim=n_sim, max_time=max_time,
         seed=seed, model_type=model_type, pop_size=pop_size, n_gen=n_gen, mutpb=mutpb, cxpb=cxpb,
         i_rep=i_rep, debug=debug) for i_rep in i_reps)
-
-
-def run_experiment_old():
-    # Experimental Parameters
-    pop_size = 100
-    n_gen = 100
-    cxpb = 0.5  # crossover rate
-    mutpb = 0.5  # mutation rate
-    max_time = 20
-    n_sim = 1
-
-    # Reproducibility first!
-    np.random.seed(seed)
-    random.seed(seed + 1)
-
-    print('run_experiment')
-    print(f'model_type {model_type}')
-
-    if (n_rep is None and i_rep is None) or (n_rep is not None and i_rep is not None):
-        raise Exception(f'Exactly one of n_rep or i_rep must not be None. n_rep={n_rep}, i_rep={i_rep}.')
-    elif (n_rep is not None):
-        i_reps = list(range(n_rep))
-    else:
-        i_reps = [i_rep]
-
-    # load dataset, shape = n_land, n_row, n_col, n_feat
-    init_landscapes = mapsynth.load_dataset_burn_i(0, dataset_dir=dataset_dir, landscape_dir=landscape_dir, func_type=func_type)
-    final_landscapes = mapsynth.load_dataset_burn_i(1, dataset_dir=dataset_dir, landscape_dir=landscape_dir, func_type=func_type)
-    future_landscapes = mapsynth.load_dataset_burn_i(2, dataset_dir=dataset_dir, landscape_dir=landscape_dir, func_type=func_type)
-
-    # train-test split
-    test_size = 10  # 10 train, 10 test
-    x_train, x_test, y_train, y_test, future_train, future_test = train_test_split(
-        init_landscapes, final_landscapes, future_landscapes, test_size=test_size)
-    print('x_train.shape, x_test.shape, y_train.shape, y_test.shape')
-    print(x_train.shape, x_test.shape, y_train.shape, y_test.shape)
-
-    # model
-    model = get_model(model_type, n_sim=n_sim, max_time=max_time, pop_size=pop_size, n_gen=n_gen, cxpb=cxpb, mutpb=mutpb)
-
-    for i_rep in i_reps:
-        print('i_rep', i_rep)
-
-        # train model
-        model.fit(x_train, y_train)
-
-        # evaluate model
-        train_fitness, test_fitness, future_train_fitness, future_test_fitness = evaluate_model_on_final_and_future(
-            model, x_train, x_test, y_train, y_test, future_train, future_test)
-
-        results = {
-            'dataset_dir': dataset_dir, 'landscape_dir': landscape_dir,
-            'func_type': func_type, 'n_rep': n_rep, 'n_sim': n_sim, 'max_time': max_time,
-            'seed': seed, 'model_type': model_type, 'out_dir': out_dir,
-            'pop_size': pop_size, 'n_gen': n_gen, 'cxpb': cxpb, 'mutpb': mutpb,
-            'train_fitness': train_fitness, 'test_fitness': test_fitness,
-            'future_train_fitness': future_train_fitness, 'future_test_fitness': future_test_fitness,
-            'model': model, 'best_model': model, 'i_rep': i_rep
-        }
-        for attr in ['fitnesses', 'hof', 'tree', 'best_ind', 'log']:
-            if hasattr(model, attr):
-                results[attr] = getattr(model, attr)
-
-        # Save Results
-        save_repetition_results(results, out_dir, i_rep, model_type)
-
 
 def process_results():
 
