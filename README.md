@@ -11,7 +11,7 @@ time python mapsynth.py burn_landscapes --dataset-dir=dataset_exp1 --max-time=20
 
 Evolve the models, tracking their performance per evaluation 
 and across generations, and evaluating the final evolved model 
-on the training and test sets.
+on the training and test sets. (This might take a while.)
 
 ```
 # the true model
@@ -26,7 +26,6 @@ time python nullexperiment.py run_experiment --dataset-dir=dataset_exp1 --out-di
 # the genetic programming model
 time python nullexperiment.py run_experiment --dataset-dir=dataset_exp1 --out-dir=real_results/dataset_exp1 --model-type=gp --n-rep=16 --pop-size=100 --n-gen=50 --mutpb=0.08 --cxpb=0.6
 ```
-
 
 ## Test Set Variation Performance
 
