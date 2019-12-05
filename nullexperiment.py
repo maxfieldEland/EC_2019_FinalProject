@@ -59,6 +59,18 @@ def get_model(model_type, n_sim=1, max_time=20, pop_size=100, n_gen=100, cxpb=0.
     return model
 
 
+def evaluate_model_on_final_and_future_batch(model, init, final, future):
+    final_pred = model.predict(init)
+    final_fitness = wildfire.multi_sim_iou_fitness(final, final_pred)
+    print(f'final_fitness {final_fitness}')
+
+    future_pred = model.predict(final)
+    future_fitness = wildfire.multi_sim_iou_fitness(future, future_pred)
+    print(f'future_fitness {future_fitness}')
+
+    return final_fitness, future_fitness
+
+
 def evaluate_model_on_final_and_future(model, x_train, x_test, y_train, y_test, future_train, future_test):
     # evaluate model
     pred_train = model.predict(x_train)
@@ -453,69 +465,77 @@ def run_experiment(dataset_dir=None, out_dir=None, func_type='balanced_logits', 
         i_rep=i_rep, debug=debug) for i_rep in i_reps)
 
 
-def run_experiment_old():
-    # Experimental Parameters
-    pop_size = 100
-    n_gen = 100
-    cxpb = 0.5  # crossover rate
-    mutpb = 0.5  # mutation rate
-    max_time = 20
-    n_sim = 1
-
-    # Reproducibility first!
+def run_variance_experiment(dataset_dir=None, out_dir=None, func_type='balanced_logits', n_sim=1, max_time=20,
+                            seed=None, model_type='balanced_logits', pop_size=100, n_gen=100,
+                            mutpb=0.5, cxpb=0.5, batch_size=10):
+    # Set Experiment Seed
     np.random.seed(seed)
-    random.seed(seed + 1)
+    random.seed(seed + 1 if seed is not None else None)
 
-    print('run_experiment')
-    print(f'model_type {model_type}')
+    # load dataset
+    # shape = n_land, n_row, n_col, n_feat
+    init_landscapes = mapsynth.load_dataset_burn_i(0, dataset_dir=dataset_dir, func_type=func_type)
+    final_landscapes = mapsynth.load_dataset_burn_i(1, dataset_dir=dataset_dir, func_type=func_type)
+    future_landscapes = mapsynth.load_dataset_burn_i(2, dataset_dir=dataset_dir, func_type=func_type)
 
-    if (n_rep is None and i_rep is None) or (n_rep is not None and i_rep is not None):
-        raise Exception(f'Exactly one of n_rep or i_rep must not be None. n_rep={n_rep}, i_rep={i_rep}.')
-    elif (n_rep is not None):
-        i_reps = list(range(n_rep))
-    else:
-        i_reps = [i_rep]
+    # shuffle datasets
+    n_land = len(init_landscapes)
+    idx = np.random.permutation(n_land)
+    init_landscapes = init_landscapes[idx]
+    final_landscapes = final_landscapes[idx]
+    future_landscapes = future_landscapes[idx]
 
-    # load dataset, shape = n_land, n_row, n_col, n_feat
-    init_landscapes = mapsynth.load_dataset_burn_i(0, dataset_dir=dataset_dir, landscape_dir=landscape_dir, func_type=func_type)
-    final_landscapes = mapsynth.load_dataset_burn_i(1, dataset_dir=dataset_dir, landscape_dir=landscape_dir, func_type=func_type)
-    future_landscapes = mapsynth.load_dataset_burn_i(2, dataset_dir=dataset_dir, landscape_dir=landscape_dir, func_type=func_type)
-
-    # train-test split
-    test_size = 10  # 10 train, 10 test
-    x_train, x_test, y_train, y_test, future_train, future_test = train_test_split(
-        init_landscapes, final_landscapes, future_landscapes, test_size=test_size)
-    print('x_train.shape, x_test.shape, y_train.shape, y_test.shape')
-    print(x_train.shape, x_test.shape, y_train.shape, y_test.shape)
+    # split into batches
+    n_batch = n_land // batch_size
+    init_batches = [init_landscapes[i * batch_size:(i + 1) * batch_size] for i in range(n_batch)]
+    final_batches = [final_landscapes[i * batch_size:(i + 1) * batch_size] for i in range(n_batch)]
+    future_batches = [future_landscapes[i * batch_size:(i + 1) * batch_size] for i in range(n_batch)]
 
     # model
-    model = get_model(model_type, n_sim=n_sim, max_time=max_time, pop_size=pop_size, n_gen=n_gen, cxpb=cxpb, mutpb=mutpb)
+    model = get_model(model_type, n_sim=n_sim, max_time=max_time, pop_size=pop_size, n_gen=n_gen,
+                      cxpb=cxpb, mutpb=mutpb)
 
-    for i_rep in i_reps:
-        print('i_rep', i_rep)
+    # train model on first batch
+    model.fit(init_batches[0], final_batches[0])
 
-        # train model
-        model.fit(x_train, y_train)
+    # evaluate model on all batches
+    future_fits = np.zeros(n_batch)
+    final_fits = np.zeros(n_batch)
+    for i in range(n_batch):
+        init_batch = init_batches[i]
+        final_batch = final_batches[i]
+        future_batch = future_batches[i]
+        final_fitness, future_fitness = evaluate_model_on_final_and_future_batch(model, init_batch, final_batch, future_batch)
+        final_fits[i] = final_fitness
+        future_fits[i] = future_fitness
 
-        # evaluate model
-        train_fitness, test_fitness, future_train_fitness, future_test_fitness = evaluate_model_on_final_and_future(
-            model, x_train, x_test, y_train, y_test, future_train, future_test)
+    print('final_fits')
+    print(final_fits)
+    print('future_fits')
+    print(future_fits)
 
-        results = {
-            'dataset_dir': dataset_dir, 'landscape_dir': landscape_dir,
-            'func_type': func_type, 'n_rep': n_rep, 'n_sim': n_sim, 'max_time': max_time,
-            'seed': seed, 'model_type': model_type, 'out_dir': out_dir,
-            'pop_size': pop_size, 'n_gen': n_gen, 'cxpb': cxpb, 'mutpb': mutpb,
-            'train_fitness': train_fitness, 'test_fitness': test_fitness,
-            'future_train_fitness': future_train_fitness, 'future_test_fitness': future_test_fitness,
-            'model': model, 'best_model': model, 'i_rep': i_rep
-        }
-        for attr in ['fitnesses', 'hof', 'tree', 'best_ind', 'log']:
-            if hasattr(model, attr):
-                results[attr] = getattr(model, attr)
+    print('mean, std, min, max')
+    print('final', final_fits.mean(), final_fits.std(), final_fits.min(), final_fits.max())
+    print('future', future_fits.mean(), future_fits.std(), future_fits.min(), future_fits.max())
 
-        # Save Results
-        save_repetition_results(results, out_dir, i_rep, model_type)
+    # initialize the results
+    results = {
+        'dataset_dir': dataset_dir,
+        'func_type': func_type, 'n_sim': n_sim, 'max_time': max_time,
+        'seed': seed,
+        'model_type': model_type, 'out_dir': out_dir,
+        'pop_size': pop_size, 'n_gen': n_gen, 'mutpb': mutpb, 'cxpb': cxpb,
+        'final_fits': final_fits, 'future_fits': future_fits,
+        'model': model, 'n_land': n_land, 'n_batch': n_batch, 'batch_size': batch_size,
+    }
+
+    # Save Results
+    save_repetition_results(results, out_dir, model_type=model_type)
+
+    plt.plot(range(n_batch), final_fits, '.', label='final')
+    plt.plot(range(n_batch), future_fits, '.', label='future')
+    plt.legend()
+    plt.title(f'Fitness of various batches for model {model_type}')
 
 
 def process_results():
@@ -661,6 +681,19 @@ if __name__ == '__main__':
     parser.add_argument('--cxpb', type=float, default=0.5, help='crossover rate')
     parser.add_argument('--debug', default=False, action='store_true', help='run a tiny experiment')
     parser.set_defaults(func=run_experiment)
+
+    parser = subparsers.add_parser('run_variance_experiment')
+    parser.add_argument('--dataset-dir', help='directory containing landscape directories', default=None)
+    parser.add_argument('--seed', type=int, default=0,
+                        help='Used to seed the random number generator for reproducibility')
+    parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
+    parser.add_argument('--out-dir', help='directory in which to save the results file of every repetition', default=None)
+    parser.add_argument('--batch-size', type=int, default=10, help='The size of the groups of landscapes evaluated. ')
+    parser.add_argument('--pop-size', type=int, default=100, help='Population size')
+    parser.add_argument('--n-gen', type=int, default=100, help='Number of generations')
+    parser.add_argument('--mutpb', type=float, default=0.5, help='mutation rate')
+    parser.add_argument('--cxpb', type=float, default=0.5, help='crossover rate')
+    parser.set_defaults(func=run_variance_experiment)
 
     parser = subparsers.add_parser('run_grid_search_experiment')
     parser.add_argument('--dataset-dir', help='directory containing landscape directories', default=None)

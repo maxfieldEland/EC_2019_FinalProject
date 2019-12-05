@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 from sklearn.metrics import jaccard_score
-import spread_functions as sp
 import sys
 
 
