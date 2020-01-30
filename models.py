@@ -60,7 +60,7 @@ class FixedLogitsModel(WildfireModel):
 
 class BalancedLogitsModel(FixedLogitsModel):
     def __init__(self, max_time=20):
-        super().__init__(bias=-7, feature_scale=np.array([6.0, 0.2, 0.2, 0.8]), max_time=max_time)
+        super().__init__(bias=-7, feature_scale=np.array([6.0, 0.2, 0.2, 5]), max_time=max_time)
 
 
 class WindLogitsModel(FixedLogitsModel):

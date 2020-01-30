@@ -545,8 +545,6 @@ def do_timestep_rep(dataset_dir=None, out_dir=None, func_type='balanced_logits',
     #     raise Exception('Unrecognized model_type for grid search cross-validation', model_type)
 
     # model
-    model = get_model(model_type, n_sim=n_sim, max_time=max_time, pop_size=pop_size, n_gen=n_gen,
-                      cxpb=cxpb, mutpb=mutpb)
 
     # train model
     model.fit(x_train, y_train)
@@ -776,130 +774,194 @@ def plot_results_model(results_dir, i_rep=0, model_type=None):
 
 def animate_results_model(landscape_dir, results_dir, i_rep=0, model_type=None, seed=None, max_time=20, n_sim=1,
                           display=False, path=None):
+    
+  
+    
     # reproducibility
     if seed is not None:
         np.random.seed(seed)
 
-    results = load_repetition_results(results_dir, i_rep, model_type)
+    true_results = load_repetition_results(results_dir, i_rep, model_type)
     fire_func = results['best_model'].get_fire_func()
     landscape = wildfire.make_landscape_from_dir(landscape_dir)
     landscape = mapsynth.start_fire(landscape)
     wildfire.animate_fire(landscape, fire_func, max_time=max_time, n_sim=n_sim, display=display, path=path)
 
 
-if __name__ == '__main__':
-    main_parser = argparse.ArgumentParser()
-    subparsers = main_parser.add_subparsers()
 
-    parser = subparsers.add_parser('run_experiment')
-    parser.add_argument('--dataset-dir', help='directory containing landscape directories', default=None)
-    parser.add_argument('--seed', type=int, default=0,
-                        help='Used to seed the random number generator for reproducibility')
-    parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
-    parser.add_argument('--out-dir', help='directory in which to save the results file of every repetition', default=None)
-    parser.add_argument('--i-rep', type=int, default=None, help='Run the ith repetition of the experiment. ')
-    parser.add_argument('--n-rep', type=int, default=1, help='Run n repetitions of the experiment')
-    parser.add_argument('--pop-size', type=int, default=100, help='Population size')
-    parser.add_argument('--n-gen', type=int, default=100, help='Number of generations')
-    parser.add_argument('--mutpb', type=float, default=0.5, help='mutation rate')
-    parser.add_argument('--cxpb', type=float, default=0.5, help='crossover rate')
-    parser.add_argument('--debug', default=False, action='store_true', help='run a tiny experiment')
-    parser.set_defaults(func=run_experiment)
 
-    parser = subparsers.add_parser('run_timesteps')
-    parser.add_argument('--dataset-dir', help='directory containing landscape directories', default=None)
-    parser.add_argument('--seed', type=int, default=0,
-                        help='Used to seed the random number generator for reproducibility')
-    parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
-    parser.add_argument('--out-dir', help='directory in which to save the results file of every repetition', default=None)
-    parser.add_argument('--i-rep', type=int, default=None, help='Run the ith repetition of the experiment. ')
-    parser.add_argument('--n-rep', type=int, default=1, help='Run n repetitions of the experiment')
-    parser.add_argument('--pop-size', type=int, default=100, help='Population size')
-    parser.add_argument('--n-gen', type=int, default=100, help='Number of generations')
-    parser.add_argument('--mutpb', type=float, default=0.5, help='mutation rate')
-    parser.add_argument('--cxpb', type=float, default=0.5, help='crossover rate')
-    parser.add_argument('--debug', default=False, action='store_true', help='run a tiny experiment')
-    parser.set_defaults(func=run_timesteps)
 
-    parser = subparsers.add_parser('run_variance_experiment')
-    parser.add_argument('--dataset-dir', help='directory containing landscape directories', default=None)
-    parser.add_argument('--seed', type=int, default=0,
-                        help='Used to seed the random number generator for reproducibility')
-    parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
-    parser.add_argument('--out-dir', help='directory in which to save the results file of every repetition', default=None)
-    parser.add_argument('--batch-size', type=int, default=10, help='The size of the groups of landscapes evaluated. ')
-    parser.add_argument('--pop-size', type=int, default=100, help='Population size')
-    parser.add_argument('--n-gen', type=int, default=100, help='Number of generations')
-    parser.add_argument('--mutpb', type=float, default=0.5, help='mutation rate')
-    parser.add_argument('--cxpb', type=float, default=0.5, help='crossover rate')
-    parser.set_defaults(func=run_variance_experiment)
 
-    parser = subparsers.add_parser('run_grid_search_experiment')
-    parser.add_argument('--dataset-dir', help='directory containing landscape directories', default=None)
-    parser.add_argument('--seed', type=int, default=0,
-                        help='Used to seed the random number generator for reproducibility')
-    parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
-    parser.add_argument('--out-dir', help='directory in which to save the results file of every repetition', default=None)
-    parser.add_argument('--i-rep', type=int, default=None, help='Run the ith repetition of the experiment. ')
-    parser.add_argument('--n-rep', type=int, default=1, help='Run n repetitions of the experiment')
-    parser.add_argument('--pop-size', type=int, default=100, help='Population size')
-    parser.add_argument('--n-gen', type=int, default=100, help='Number of generations')
-    parser.add_argument('--debug', default=False, action='store_true', help='run a tiny experiment')
-    parser.set_defaults(func=run_grid_search_experiment)
+def animate():
+    animate_results_model(landscape_dir, results_dir, i_rep=0, model_type=None, seed=None, max_time=20, n_sim=1,
+                          display=False, path=None, fire_color = "red")
+    
+    
+def animate_results_two_models(landscape_dir, results_dir, i_rep=0, model_type=None, seed=None, max_time=20, n_sim=1,
+                          display=False, path=None):
+    
+    
+      # generate burn using balanced logits
+    # generate equal burn using most fit GP individual
+    
+    results_dir = "real_results/dataset_exp1"
+    landscape_dir = "dataset_exp1/landscape_09"
+    model_type = 'logistic'
+    results_exp = load_repetition_results(results_dir, i_rep, model_type)
+    results_true = load_repetition_results(results_dir, i_rep, 'gp')
 
-    parser = subparsers.add_parser('run_grid_search_experiment_2')
-    parser.add_argument('--dataset-dir', help='directory containing landscape directories', default=None)
-    parser.add_argument('--seed', type=int, default=0,
-                        help='Used to seed the random number generator for reproducibility')
-    parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
-    parser.add_argument('--out-dir', help='directory in which to save the results file of every repetition', default=None)
-    parser.add_argument('--i-rep', type=int, default=None, help='Run the ith repetition of the experiment. ')
-    parser.add_argument('--n-rep', type=int, default=1, help='Run n repetitions of the experiment')
-    parser.add_argument('--pop-size', type=int, default=100, help='Population size')
-    parser.add_argument('--n-gen', type=int, default=100, help='Number of generations')
-    parser.add_argument('--debug', default=False, action='store_true', help='run a tiny experiment')
-    parser.set_defaults(func=run_grid_search_experiment_2)
+    
 
-    parser = subparsers.add_parser('animate_results_model')
-    parser.add_argument('--landscape-dir', help='directory containing landscape layers', default=None)
-    parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
-    parser.add_argument('--results-dir', help='directory in which to save the results file of every repetition', default=None)
-    parser.add_argument('--i-rep', type=int, default=None, help='Run the ith repetition of the experiment. ')
-    parser.add_argument('--max-time', type=int, help='The length of time to simulate the fire during each period')
-    parser.add_argument('--n-sim', type=int, help='The number of simulations.', default=1)
-    parser.add_argument('--seed', type=int, default=0,
-                        help='Used to seed the random number generator for reproducibility')
-    parser.add_argument('--display', default=False, action='store_true', help='Display the animation')
-    parser.set_defaults(func=animate_results_model)
+    # get gp model from results
+    fire_func_exp = results_exp['model'].get_fire_func()
+    fire_func_true = results_true['model'].get_fire_func()
+    
+    
+    landscape = wildfire.make_landscape_from_dir(landscape_dir)
+    landscape = mapsynth.start_fire(landscape)
+    
+    fire_color = np.array([252., 2, 7, 255]) / 255  # red fire
 
-    parser = subparsers.add_parser('plot_results_model')
-    parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
-    parser.add_argument('--results-dir', help='directory in which to save the results file of every repetition', default=None)
-    parser.add_argument('--i-rep', type=int, default=None, help='Run the ith repetition of the experiment. ')
-    parser.set_defaults(func=plot_results_model)
+    wildfire.animate_fire(landscape, fire_func_true, max_time=70, n_sim=5, display=display, path='pred_exp2.mp4', fire_color = fire_color)
 
-    parser = subparsers.add_parser('plot_hyperparam_search_results')
-    parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
-    parser.add_argument('--results-dir', help='directory in which to save the results file of every repetition', default=None)
-    parser.add_argument('--i-rep', type=int, default=None, help='Run the ith repetition of the experiment. ')
-    parser.set_defaults(func=plot_hyperparam_search_results)
+     ##  TRUTH!
 
-    parser = subparsers.add_parser('do_grid_search_rep')
-    parser.add_argument('--dataset-dir', help='directory containing landscape directories', default=None)
-    parser.add_argument('--seed', type=int, default=0,
-                        help='Used to seed the random number generator for reproducibility')
-    parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
-    parser.add_argument('--out-dir', help='directory in which to save the results file of every repetition', default=None)
-    parser.add_argument('--i-rep', type=int, default=None, help='Run the ith repetition of the experiment. ')
-    parser.add_argument('--i-hp', type=int, default=None,
-                        help='Evaluate the ith parameter combination in the parameter grid')
-    parser.add_argument('--pop-size', type=int, default=100, help='Population size')
-    parser.add_argument('--n-gen', type=int, default=100, help='Number of generations')
-    parser.add_argument('--debug', default=False, action='store_true', help='run a tiny experiment')
-    parser.set_defaults(func=do_grid_search_rep)
+    results_dir = "real_results/dataset_exp1"
+    landscape_dir = "dataset_exp1/landscape_09"
+    model_type = 'balanced_logits'
+    results_true = load_repetition_results(results_dir, i_rep, model_type)
+    
 
-    args = main_parser.parse_args()
-    func = args.func
-    kws = vars(args)
-    del kws['func']
-    func(**kws)
+    # get gp model from results
+    
+    fire_color = np.array([244., 250, 10, 255]) / 255  # yellow fire
+
+    fire_func_exp = results_exp['model'].get_fire_func()
+    fire_func_true = results_true['model'].get_fire_func()
+    
+    
+    landscape = wildfire.make_landscape_from_dir(landscape_dir)
+    landscape = mapsynth.start_fire(landscape)
+    
+    
+    wildfire.animate_fire(landscape, fire_func_true, max_time=70, n_sim=1, display=display, path='truth_exp2.mp4', fire_color = fire_color)
+
+
+
+
+#if __name__ == '__main__':
+#    main_parser = argparse.ArgumentParser()
+#    subparsers = main_parser.add_subparsers()
+#
+#    parser = subparsers.add_parser('run_experiment')
+#    parser.add_argument('--dataset-dir', help='directory containing landscape directories', default=None)
+#    parser.add_argument('--seed', type=int, default=0,
+#                        help='Used to seed the random number generator for reproducibility')
+#    parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
+#    parser.add_argument('--out-dir', help='directory in which to save the results file of every repetition', default=None)
+#    parser.add_argument('--i-rep', type=int, default=None, help='Run the ith repetition of the experiment. ')
+#    parser.add_argument('--n-rep', type=int, default=1, help='Run n repetitions of the experiment')
+#    parser.add_argument('--pop-size', type=int, default=100, help='Population size')
+#    parser.add_argument('--n-gen', type=int, default=100, help='Number of generations')
+#    parser.add_argument('--mutpb', type=float, default=0.5, help='mutation rate')
+#    parser.add_argument('--cxpb', type=float, default=0.5, help='crossover rate')
+#    parser.add_argument('--debug', default=False, action='store_true', help='run a tiny experiment')
+#    parser.set_defaults(func=run_experiment)
+#
+#    parser = subparsers.add_parser('run_timesteps')
+#    parser.add_argument('--dataset-dir', help='directory containing landscape directories', default=None)
+#    parser.add_argument('--seed', type=int, default=0,
+#                        help='Used to seed the random number generator for reproducibility')
+#    parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
+#    parser.add_argument('--out-dir', help='directory in which to save the results file of every repetition', default=None)
+#    parser.add_argument('--i-rep', type=int, default=None, help='Run the ith repetition of the experiment. ')
+#    parser.add_argument('--n-rep', type=int, default=1, help='Run n repetitions of the experiment')
+#    parser.add_argument('--pop-size', type=int, default=100, help='Population size')
+#    parser.add_argument('--n-gen', type=int, default=100, help='Number of generations')
+#    parser.add_argument('--mutpb', type=float, default=0.5, help='mutation rate')
+#    parser.add_argument('--cxpb', type=float, default=0.5, help='crossover rate')
+#    parser.add_argument('--debug', default=False, action='store_true', help='run a tiny experiment')
+#    parser.set_defaults(func=run_timesteps)
+#
+#    parser = subparsers.add_parser('run_variance_experiment')
+#    parser.add_argument('--dataset-dir', help='directory containing landscape directories', default=None)
+#    parser.add_argument('--seed', type=int, default=0,
+#                        help='Used to seed the random number generator for reproducibility')
+#    parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
+#    parser.add_argument('--out-dir', help='directory in which to save the results file of every repetition', default=None)
+#    parser.add_argument('--batch-size', type=int, default=10, help='The size of the groups of landscapes evaluated. ')
+#    parser.add_argument('--pop-size', type=int, default=100, help='Population size')
+#    parser.add_argument('--n-gen', type=int, default=100, help='Number of generations')
+#    parser.add_argument('--mutpb', type=float, default=0.5, help='mutation rate')
+#    parser.add_argument('--cxpb', type=float, default=0.5, help='crossover rate')
+#    parser.set_defaults(func=run_variance_experiment)
+#
+#    parser = subparsers.add_parser('run_grid_search_experiment')
+#    parser.add_argument('--dataset-dir', help='directory containing landscape directories', default=None)
+#    parser.add_argument('--seed', type=int, default=0,
+#                        help='Used to seed the random number generator for reproducibility')
+#    parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
+#    parser.add_argument('--out-dir', help='directory in which to save the results file of every repetition', default=None)
+#    parser.add_argument('--i-rep', type=int, default=None, help='Run the ith repetition of the experiment. ')
+#    parser.add_argument('--n-rep', type=int, default=1, help='Run n repetitions of the experiment')
+#    parser.add_argument('--pop-size', type=int, default=100, help='Population size')
+#    parser.add_argument('--n-gen', type=int, default=100, help='Number of generations')
+#    parser.add_argument('--debug', default=False, action='store_true', help='run a tiny experiment')
+#    parser.set_defaults(func=run_grid_search_experiment)
+#
+#    parser = subparsers.add_parser('run_grid_search_experiment_2')
+#    parser.add_argument('--dataset-dir', help='directory containing landscape directories', default=None)
+#    parser.add_argument('--seed', type=int, default=0,
+#                        help='Used to seed the random number generator for reproducibility')
+#    parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
+#    parser.add_argument('--out-dir', help='directory in which to save the results file of every repetition', default=None)
+#    parser.add_argument('--i-rep', type=int, default=None, help='Run the ith repetition of the experiment. ')
+#    parser.add_argument('--n-rep', type=int, default=1, help='Run n repetitions of the experiment')
+#    parser.add_argument('--pop-size', type=int, default=100, help='Population size')
+#    parser.add_argument('--n-gen', type=int, default=100, help='Number of generations')
+#    parser.add_argument('--debug', default=False, action='store_true', help='run a tiny experiment')
+#    parser.set_defaults(func=run_grid_search_experiment_2)
+#
+#    parser = subparsers.add_parser('animate_results_model')
+#    parser.add_argument('--landscape-dir', help='directory containing landscape layers', default=None)
+#    parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
+#    parser.add_argument('--results-dir', help='directory in which to save the results file of every repetition', default=None)
+#    parser.add_argument('--i-rep', type=int, default=None, help='Run the ith repetition of the experiment. ')
+#    parser.add_argument('--max-time', type=int, help='The length of time to simulate the fire during each period')
+#    parser.add_argument('--n-sim', type=int, help='The number of simulations.', default=1)
+#    parser.add_argument('--seed', type=int, default=0,
+#                        help='Used to seed the random number generator for reproducibility')
+#    parser.add_argument('--display', default=False, action='store_true', help='Display the animation')
+#    parser.set_defaults(func=animate_results_model)
+#
+#    parser = subparsers.add_parser('plot_results_model')
+#    parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
+#    parser.add_argument('--results-dir', help='directory in which to save the results file of every repetition', default=None)
+#    parser.add_argument('--i-rep', type=int, default=None, help='Run the ith repetition of the experiment. ')
+#    parser.set_defaults(func=plot_results_model)
+#
+#    parser = subparsers.add_parser('plot_hyperparam_search_results')
+#    parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
+#    parser.add_argument('--results-dir', help='directory in which to save the results file of every repetition', default=None)
+#    parser.add_argument('--i-rep', type=int, default=None, help='Run the ith repetition of the experiment. ')
+#    parser.set_defaults(func=plot_hyperparam_search_results)
+#
+#    parser = subparsers.add_parser('do_grid_search_rep')
+#    parser.add_argument('--dataset-dir', help='directory containing landscape directories', default=None)
+#    parser.add_argument('--seed', type=int, default=0,
+#                        help='Used to seed the random number generator for reproducibility')
+#    parser.add_argument('--model-type', help='e.g constant, balanced_logits or gp)', default='constant')
+#    parser.add_argument('--out-dir', help='directory in which to save the results file of every repetition', default=None)
+#    parser.add_argument('--i-rep', type=int, default=None, help='Run the ith repetition of the experiment. ')
+#    parser.add_argument('--i-hp', type=int, default=None,
+#                        help='Evaluate the ith parameter combination in the parameter grid')
+#    parser.add_argument('--pop-size', type=int, default=100, help='Population size')
+#    parser.add_argument('--n-gen', type=int, default=100, help='Number of generations')
+#    parser.add_argument('--debug', default=False, action='store_true', help='run a tiny experiment')
+#    parser.set_defaults(func=do_grid_search_rep)
+#
+#    args = main_parser.parse_args()
+#    func = args.func
+#    kws = vars(args)
+#    del kws['func']
+#    func(**kws)

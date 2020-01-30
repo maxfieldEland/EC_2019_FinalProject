@@ -37,7 +37,7 @@ L_WS = 5  # wind speed
 L_WD = 6  # wind direction
 
 
-def animate_fire(landscape, fire_func, max_time=20, n_sim=1, display=False, path=None):
+def animate_fire(landscape, fire_func, max_time=20, n_sim=1, display=False, path=None, fire_color = None):
     '''
     Animate a fire on a landscape. Save the animation to a file.
     :param landscape: the initial landscape to burn
@@ -69,7 +69,7 @@ def animate_fire(landscape, fire_func, max_time=20, n_sim=1, display=False, path
     # a fiery orange: 240, 91, 11
     # fire_color = np.array([252., 2, 7, 255]) / 255  # red fire
     # fire_color = np.array([244., 250, 10, 255]) / 255  # yellow fire
-    fire_color = np.array([240., 91, 11, 255]) / 255  # orange fire
+    #fire_color = np.array([240., 91, 11, 255]) / 255  # orange fire
     tree_color = np.array([17., 128, 2, 255]) / 255
     reds = np.linspace(fire_color[0], tree_color[0], 100)
     greens = np.linspace(fire_color[1], tree_color[1], 100)
@@ -107,6 +107,10 @@ def animate_fire(landscape, fire_func, max_time=20, n_sim=1, display=False, path
 
     if path is not None:
         ani.save(path)
+
+
+
+
 
 
 def show_landscape(landscape):
