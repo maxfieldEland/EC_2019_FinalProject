@@ -67,3 +67,4 @@ Examine the variance of the test set fitness of a model by evaluating it on mult
 ```
 time python nullexperiment.py run_variance_experiment --dataset-dir=dataset100 --model-type=balanced_logits --batch-size=10 --out-dir=results_variance/dataset100
 ```
+# deep-fire
