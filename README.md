@@ -1,5 +1,13 @@
 # Wildfire: UVM CS352 Evolutionary Computation Final Project Fall 2019
 
+With the increased size and frequency of wildfire events worldwide, accurate real-time prediction of evolving wildfire fronts is a crucial component of firefighting efforts and forest management practices. 
+We propose a cellular automata (CA) that simulates the spread of wildfire. 
+We embed the CA inside of a genetic program (GP) that learns the state transition rules from spatially registered synthetic wildfire data. 
+We demonstrate this model's predictive abilities by testing it on unseen synthetically generated landscapes. We compare the performance of a genetic program (GP) based on a set of primitive operators and restricted expression length to null and logistic models.
+
+We find that the GP is able to closely replicate the spreading behavior driven by a balanced logistic model. 
+Our method is a potential alternative to current benchmark physics-based models.
+
 ## Experiment 1 Usage
 
 Create a 20 landscape dataset, 10 for training and 10 for testing.
