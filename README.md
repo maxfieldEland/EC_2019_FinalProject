@@ -1,5 +1,4 @@
-# Wildfire: UVM CS352 Evolutionary Computation Final Project Fall 2019
-
+# Wildfire: FIREGEN
 With the increased size and frequency of wildfire events worldwide, accurate real-time prediction of evolving wildfire fronts is a crucial component of firefighting efforts and forest management practices. 
 We propose a cellular automata (CA) that simulates the spread of wildfire. 
 We embed the CA inside of a genetic program (GP) that learns the state transition rules from spatially registered synthetic wildfire data. 
